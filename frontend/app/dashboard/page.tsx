@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { PresentationCard } from '@/components/dashboard/presentation-card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -17,7 +17,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Initial fetch on mount - NO POLLING
   useEffect(() => {
     console.log('[Dashboard] Auth state:', { authLoading, user: !!user });
 
@@ -35,21 +37,15 @@ export default function DashboardPage() {
     }
 
     console.log('[Dashboard] User found, fetching presentations...');
-    // User exists, fetch presentations
     fetchPresentations();
-
-    // Poll for updates if any presentations are generating
-    const pollInterval = setInterval(() => {
-      fetchPresentations();
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(pollInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, router]);
 
-  const fetchPresentations = async () => {
+  const fetchPresentations = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       const response = await fetch(`${API_URL}/api/presentations?user_id=${user?.id}`);
 
@@ -63,8 +59,16 @@ export default function DashboardPage() {
       console.error('Error fetching presentations:', err);
       setError(err instanceof Error ? err.message : 'Failed to load presentations');
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchPresentations(false);
+    setRefreshing(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -148,6 +152,15 @@ export default function DashboardPage() {
               <span className="text-sm font-medium">Dossier AI</span>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
               <Button
                 variant="brand"
                 size="sm"
