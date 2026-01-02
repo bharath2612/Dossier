@@ -1,0 +1,131 @@
+'use client';
+
+import { useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import type { Presentation } from '@/types/presentation';
+import { MoreVertical, Eye, Edit, Copy, Trash2 } from 'lucide-react';
+
+interface PresentationCardProps {
+  presentation: Presentation;
+  onView: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}
+
+export function PresentationCard({
+  presentation,
+  onView,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: PresentationCardProps) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const slideCount = presentation.slides.length;
+  const updatedAt = new Date(presentation.updated_at);
+  const timeAgo = formatDistanceToNow(updatedAt, { addSuffix: true });
+
+  return (
+    <div className="group relative rounded-lg border border-border bg-card p-6 transition-all hover:border-brand/50">
+      {/* Card Content */}
+      <div className="cursor-pointer" onClick={onView}>
+        {/* Title */}
+        <h3 className="text-lg font-medium text-foreground line-clamp-2">
+          {presentation.title}
+        </h3>
+
+        {/* Metadata */}
+        <div className="mt-3 flex items-center space-x-3 font-mono text-xs text-muted-foreground">
+          <span>{slideCount} slides</span>
+          <span className="text-border">|</span>
+          <span className="capitalize">{presentation.citation_style}</span>
+          <span className="text-border">|</span>
+          <span className="capitalize">{presentation.theme}</span>
+        </div>
+
+        {/* Updated time */}
+        <p className="mt-4 text-xs text-muted-foreground">Updated {timeAgo}</p>
+      </div>
+
+      {/* Actions Menu */}
+      <div className="absolute right-4 top-4">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+
+        {showMenu && (
+          <>
+            {/* Backdrop to close menu */}
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setShowMenu(false)}
+            />
+
+            {/* Menu */}
+            <div className="absolute right-0 top-8 z-20 w-48 rounded-md border border-border bg-card py-1 shadow-lg">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  onView();
+                }}
+                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+              >
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                <span>View</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+              >
+                <Edit className="h-4 w-4 text-muted-foreground" />
+                <span>Edit</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  onDuplicate();
+                }}
+                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+              >
+                <Copy className="h-4 w-4 text-muted-foreground" />
+                <span>Duplicate</span>
+              </button>
+
+              <div className="my-1 border-t border-border" />
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-destructive transition-colors hover:bg-secondary"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Hover indicator - subtle green accent */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-lg bg-brand opacity-0 transition-opacity group-hover:opacity-100" />
+    </div>
+  );
+}

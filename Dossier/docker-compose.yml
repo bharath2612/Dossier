@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Supabase PostgreSQL
+  postgres:
+    image: supabase/postgres:15.1.0.147
+    container_name: dossier-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dossier
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supabase Studio (UI for database management)
+  studio:
+    image: supabase/studio:20231123-64a766a
+    container_name: dossier-studio
+    ports:
+      - "3000:3000"
+    environment:
+      SUPABASE_URL: http://localhost:8000
+      STUDIO_PG_META_URL: http://postgres:5432
+    depends_on:
+      - postgres
+
+volumes:
+  postgres-data:
+    driver: local

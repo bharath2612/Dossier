@@ -1,0 +1,240 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   GREPTILE-INSPIRED DESIGN SYSTEM
+   ============================================ */
+
+@theme inline {
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* Brand Green */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  /* Grid */
+  --color-grid: var(--grid);
+
+  /* Fonts */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* ============================================
+   LIGHT MODE (Default)
+   Greptile: Off-white, calm, editorial
+   ============================================ */
+:root {
+  --radius: 0.5rem;
+
+  /* Backgrounds */
+  --background: #f8f8f7;
+  --foreground: #1a1a1a;
+
+  /* Cards & Surfaces */
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+
+  /* Primary - Dark for contrast */
+  --primary: #1a1a1a;
+  --primary-foreground: #fafafa;
+
+  /* Secondary - Subtle gray */
+  --secondary: #f0f0ef;
+  --secondary-foreground: #1a1a1a;
+
+  /* Muted - For less important text */
+  --muted: #f0f0ef;
+  --muted-foreground: #6b6b6b;
+
+  /* Accent - Brand Green (used sparingly) */
+  --accent: #127a4d;
+  --accent-foreground: #ffffff;
+
+  /* Brand Green - Primary CTA color */
+  --brand: #127a4d;
+  --brand-foreground: #ffffff;
+
+  /* Destructive */
+  --destructive: #dc2626;
+
+  /* Borders & Inputs */
+  --border: #e5e5e4;
+  --input: #e5e5e4;
+  --ring: #127a4d;
+
+  /* Grid Pattern */
+  --grid: rgba(0, 0, 0, 0.03);
+}
+
+/* ============================================
+   DARK MODE
+   Greptile: Deep charcoal, not pure black
+   ============================================ */
+.dark {
+  /* Backgrounds */
+  --background: #111110;
+  --foreground: #e8e8e6;
+
+  /* Cards & Surfaces */
+  --card: #1a1a19;
+  --card-foreground: #e8e8e6;
+  --popover: #1a1a19;
+  --popover-foreground: #e8e8e6;
+
+  /* Primary - Light for contrast */
+  --primary: #e8e8e6;
+  --primary-foreground: #111110;
+
+  /* Secondary */
+  --secondary: #252524;
+  --secondary-foreground: #e8e8e6;
+
+  /* Muted */
+  --muted: #252524;
+  --muted-foreground: #8a8a88;
+
+  /* Accent - Same Brand Green */
+  --accent: #127a4d;
+  --accent-foreground: #ffffff;
+
+  /* Brand Green - Same across modes */
+  --brand: #127a4d;
+  --brand-foreground: #ffffff;
+
+  /* Destructive */
+  --destructive: #ef4444;
+
+  /* Borders & Inputs */
+  --border: #2a2a29;
+  --input: #2a2a29;
+  --ring: #127a4d;
+
+  /* Grid Pattern - Slightly more visible */
+  --grid: rgba(255, 255, 255, 0.04);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Sharp typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Mono-style captions */
+  .caption {
+    @apply font-mono text-xs uppercase tracking-wider text-muted-foreground;
+  }
+}
+
+/* ============================================
+   GRID PATTERN BACKGROUND
+   Subtle square/grid pattern
+   ============================================ */
+.grid-pattern {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.grid-pattern-lg {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Grid with accent on specific lines */
+.grid-pattern-accent {
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(rgba(18, 122, 77, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 122, 77, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Focus ring with brand color */
+.focus-brand {
+  @apply focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Brand green text */
+.text-brand {
+  color: var(--brand);
+}
+
+/* Brand green background */
+.bg-brand {
+  background-color: var(--brand);
+}
+
+/* Hover state for brand */
+.hover-brand:hover {
+  background-color: #0f6640;
+}
+
+/* Divider with subtle green accent */
+.divider-accent {
+  @apply h-px w-full;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  opacity: 0.2;
+}
+
+/* ============================================
+   SMOOTH TRANSITIONS FOR THEME SWITCH
+   ============================================ */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Prevent transition on initial load */
+html.no-transition,
+html.no-transition * {
+  transition: none !important;
+}

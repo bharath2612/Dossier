@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dossier AI - OG Image Template</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .og-container {
+      width: 1200px;
+      height: 630px;
+      background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+      border: 2px solid #e0e0e0;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .og-container::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 1000px;
+      height: 1000px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      background: #10b981;
+      border-radius: 16px;
+      margin-bottom: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 48px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .caption {
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #6b7280;
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .headline {
+      font-size: 72px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 32px;
+      text-align: center;
+      line-height: 1.1;
+      letter-spacing: -2px;
+    }
+
+    .subheadline {
+      font-size: 32px;
+      color: #6b7280;
+      text-align: center;
+      max-width: 800px;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 50px;
+      font-size: 18px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .download-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: transform 0.2s;
+    }
+
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+
+    .instructions {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      max-width: 300px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #4b5563;
+    }
+
+    .instructions h3 {
+      margin-bottom: 12px;
+      color: #1f2937;
+      font-size: 16px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="instructions">
+    <h3>📸 How to capture:</h3>
+    <ol>
+      <li>Click the "Download Image" button</li>
+      <li>Or take a screenshot (1200x630)</li>
+      <li>Save as <code>og-image.png</code></li>
+      <li>Move to <code>frontend/public/</code></li>
+    </ol>
+  </div>
+
+  <button class="download-btn" onclick="downloadImage()">
+    Download Image
+  </button>
+
+  <div class="og-container" id="ogImage">
+    <div class="logo">D</div>
+    <div class="caption">AI-Powered Research</div>
+    <div class="headline">Research-backed<br>presentations</div>
+    <div class="subheadline">
+      Generate presentations backed by credible sources. No fluff.
+    </div>
+    <div class="footer">dossier.ai</div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    async function downloadImage() {
+      const button = document.querySelector('.download-btn');
+      const instructions = document.querySelector('.instructions');
+      const originalText = button.textContent;
+      
+      button.textContent = 'Capturing...';
+      button.disabled = true;
+      
+      // Hide button and instructions temporarily
+      button.style.display = 'none';
+      instructions.style.display = 'none';
+      
+      try {
+        const element = document.getElementById('ogImage');
+        const canvas = await html2canvas(element, {
+          width: 1200,
+          height: 630,
+          scale: 2,
+          backgroundColor: null,
+          logging: false
+        });
+        
+        // Convert to blob and download
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'og-image.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Show success message
+          button.textContent = '✓ Downloaded!';
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.style.display = 'block';
+            instructions.style.display = 'block';
+            button.disabled = false;
+          }, 2000);
+        }, 'image/png');
+        
+      } catch (error) {
+        console.error('Error generating image:', error);
+        button.textContent = '✗ Error';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.display = 'block';
+          instructions.style.display = 'block';
+          button.disabled = false;
+        }, 2000);
+      }
+    }
+
+    // Add keyboard shortcut
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        downloadImage();
+      }
+    });
+  </script>
+</body>
+</html>
+
+
+
