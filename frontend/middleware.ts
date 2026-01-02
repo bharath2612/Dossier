@@ -57,15 +57,7 @@ export async function middleware(request: NextRequest) {
   // Get the current user
   const { data: { user } } = await supabase.auth.getUser();
   
-  const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback');
   const isDashboard = request.nextUrl.pathname.startsWith('/dashboard');
-  const isRoot = request.nextUrl.pathname === '/';
-
-  // Redirect logged-in users from landing page to dashboard
-  if (user && isRoot && !isAuthCallback) {
-    const dashboardUrl = new URL('/dashboard', request.url);
-    return NextResponse.redirect(dashboardUrl);
-  }
 
   // Redirect non-logged-in users from dashboard to landing page
   if (!user && isDashboard) {

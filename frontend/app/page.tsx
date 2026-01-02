@@ -3,9 +3,11 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { LayoutDashboard } from 'lucide-react';
 import { GenerationProgress } from '@/components/outline/generation-progress';
 import { OutlineEditor } from '@/components/outline/outline-editor';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
 import { useDraftStore } from '@/store/draft';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,18 +25,8 @@ function LandingPageContent() {
   const [progress, setProgress] = useState(0);
   const [outline, setOutline] = useState<GenerateOutlineResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [redirecting, setRedirecting] = useState(false);
 
   const { setOutline: setDraftOutline, setCurrentDraft, outline: storedOutline } = useDraftStore();
-
-  // Redirect logged-in users to dashboard (unless they're in the middle of generating)
-  useEffect(() => {
-    if (!loading && user && stage === 'input' && !storedOutline) {
-      console.log('[Landing] User is logged in, redirecting to dashboard');
-      setRedirecting(true);
-      router.push('/dashboard');
-    }
-  }, [user, loading, stage, storedOutline, router]);
 
   // Check for auth/generation errors
   useEffect(() => {
@@ -120,14 +112,14 @@ function LandingPageContent() {
     setError(null);
   };
 
-  // Show loading state while checking auth or redirecting
-  if (loading || redirecting) {
+  // Show loading state while checking auth
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
         <div className="text-center">
           <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-border border-t-brand mx-auto" />
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            {redirecting ? 'Redirecting to dashboard...' : 'Loading...'}
+            Loading...
           </p>
         </div>
       </div>
@@ -150,14 +142,16 @@ function LandingPageContent() {
               />
               <span className="text-sm font-medium text-foreground">Dossier AI</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {user && (
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => router.push('/dashboard')}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
+                  <LayoutDashboard className="h-4 w-4" />
                   Dashboard
-                </button>
+                </Button>
               )}
               <ThemeToggle />
             </div>

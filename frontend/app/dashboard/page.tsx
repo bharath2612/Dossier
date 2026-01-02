@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Search, Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useDraftStore } from '@/store/draft';
 import { PresentationCard } from '@/components/dashboard/presentation-card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -13,41 +14,23 @@ import type { Presentation } from '@/types/presentation';
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { clearDraft } = useDraftStore();
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const hasFetchedRef = useRef(false);
 
-  // Initial fetch on mount - NO POLLING
-  useEffect(() => {
-    console.log('[Dashboard] Auth state:', { authLoading, user: !!user });
-
-    // Wait for auth to finish loading before making any decisions
-    if (authLoading) {
-      console.log('[Dashboard] Still loading auth...');
-      return;
-    }
-
-    // Only redirect if we've confirmed there's no user after loading
-    if (!user) {
-      console.log('[Dashboard] No user found after auth loaded, redirecting to home');
-      router.push('/');
-      return;
-    }
-
-    console.log('[Dashboard] User found, fetching presentations...');
-    fetchPresentations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, router]);
-
-  const fetchPresentations = async (showLoading = true) => {
+  const fetchPresentations = useCallback(async (showLoading = true) => {
+    if (!user?.id) return;
+    
     try {
       if (showLoading) {
         setLoading(true);
       }
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations?user_id=${user?.id}`);
+      const response = await fetch(`${API_URL}/api/presentations?user_id=${user.id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch presentations');
@@ -63,12 +46,36 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-  };
+  }, [user?.id]);
+
+  // Initial fetch on mount - NO POLLING
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      router.push('/');
+      return;
+    }
+
+    // Only fetch once when component mounts and user is ready
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchPresentations();
+    }
+  }, [user, authLoading, fetchPresentations, router]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchPresentations(false);
     setRefreshing(false);
+  };
+
+  const handleNewPresentation = () => {
+    // Clear any existing draft/outline to start fresh
+    clearDraft();
+    router.push('/');
   };
 
   const handleDelete = async (id: string) => {
@@ -164,7 +171,7 @@ export default function DashboardPage() {
               <Button
                 variant="brand"
                 size="sm"
-                onClick={() => router.push('/')}
+                onClick={handleNewPresentation}
               >
                 <Plus className="h-4 w-4" />
                 New Presentation
