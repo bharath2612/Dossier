@@ -52,6 +52,7 @@ app.get('/', (_req, res) => {
             'DELETE /api/drafts/:id - Delete draft',
             'GET /api/drafts - Get all drafts',
             'POST /api/generate-presentation - Generate full presentation',
+            'GET /api/presentations/:id/stream - SSE stream for presentation status',
             'GET /api/presentations/:id - Get presentation',
             'GET /api/presentations - Get all presentations for user',
             'PATCH /api/presentations/:id - Update presentation',
@@ -79,6 +80,7 @@ app.delete('/api/drafts/:id', drafts_1.handleDeleteDraft);
 app.get('/api/drafts', drafts_1.handleGetAllDrafts);
 // Presentation endpoints
 app.post('/api/generate-presentation', presentations_1.handleGeneratePresentation);
+app.get('/api/presentations/:id/stream', presentations_1.handlePresentationStream); // SSE endpoint
 app.get('/api/presentations/:id', presentations_1.handleGetPresentation);
 app.get('/api/presentations', presentations_1.handleGetAllPresentations);
 app.patch('/api/presentations/:id', presentations_1.handleUpdatePresentation);

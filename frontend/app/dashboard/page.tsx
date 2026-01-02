@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Search, Plus, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,8 +11,9 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import type { Presentation } from '@/types/presentation';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { clearDraft } = useDraftStore();
   const [presentations, setPresentations] = useState<Presentation[]>([]);
@@ -21,6 +22,17 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const hasFetchedRef = useRef(false);
+  const sseConnectionsRef = useRef<Map<string, EventSource>>(new Map());
+  
+  // Check for generation error from auth callback
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError === 'generation_failed') {
+      setError('Failed to generate presentation. Please try again.');
+      // Clear the error from URL after showing it
+      router.replace('/dashboard');
+    }
+  }, [searchParams, router]);
 
   const fetchPresentations = useCallback(async (showLoading = true) => {
     if (!user?.id) return;
@@ -48,7 +60,7 @@ export default function DashboardPage() {
     }
   }, [user?.id]);
 
-  // Initial fetch on mount - NO POLLING
+  // Initial fetch on mount and setup polling for generating presentations
   useEffect(() => {
     if (authLoading) {
       return;
@@ -65,6 +77,91 @@ export default function DashboardPage() {
       fetchPresentations();
     }
   }, [user, authLoading, fetchPresentations, router]);
+
+  // Use SSE for real-time updates on generating presentations
+  useEffect(() => {
+    if (!user || presentations.length === 0) {
+      return;
+    }
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const generatingPresentations = presentations.filter(p => p.status === 'generating');
+    const connections = sseConnectionsRef.current;
+    
+    // Close connections for presentations that are no longer generating
+    connections.forEach((eventSource, presentationId) => {
+      const presentation = presentations.find(p => p.id === presentationId);
+      if (!presentation || presentation.status !== 'generating') {
+        console.log(`[Dashboard SSE] Closing connection for completed presentation ${presentationId}`);
+        eventSource.close();
+        connections.delete(presentationId);
+      }
+    });
+
+    // Create SSE connections for new generating presentations
+    generatingPresentations.forEach((presentation) => {
+      // Skip if connection already exists
+      if (connections.has(presentation.id)) {
+        return;
+      }
+
+      try {
+        console.log(`[Dashboard SSE] Creating connection for presentation ${presentation.id}`);
+        const eventSource = new EventSource(
+          `${API_URL}/api/presentations/${presentation.id}/stream?user_id=${user.id}`
+        );
+
+        eventSource.onopen = () => {
+          console.log(`[Dashboard SSE] Connected for presentation ${presentation.id}`);
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const updatedPres = JSON.parse(event.data);
+            console.log(`[Dashboard SSE] Update received for ${presentation.id}:`, updatedPres.status);
+            
+            // Update the specific presentation in state
+            setPresentations((prev) =>
+              prev.map((p) => (p.id === updatedPres.id ? updatedPres : p))
+            );
+
+            // If complete, close this connection
+            if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
+              console.log(`[Dashboard SSE] Presentation ${presentation.id} ${updatedPres.status}, closing connection`);
+              eventSource.close();
+              connections.delete(presentation.id);
+            }
+          } catch (parseError) {
+            console.error('[Dashboard SSE] Error parsing message:', parseError);
+          }
+        };
+
+        eventSource.onerror = (err) => {
+          console.error(`[Dashboard SSE] Error for presentation ${presentation.id}:`, err);
+          
+          // If connection is closed, remove from map
+          if (eventSource.readyState === EventSource.CLOSED) {
+            connections.delete(presentation.id);
+          }
+        };
+
+        connections.set(presentation.id, eventSource);
+      } catch (sseError) {
+        console.error(`[Dashboard SSE] Failed to create EventSource for ${presentation.id}:`, sseError);
+      }
+    });
+
+    // Cleanup: close all SSE connections on unmount
+    return () => {
+      console.log('[Dashboard SSE] Component unmounting, cleaning up all connections');
+      connections.forEach((es) => {
+        if (es.readyState !== EventSource.CLOSED) {
+          es.close();
+        }
+      });
+      connections.clear();
+    };
+  }, [presentations, user]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -142,6 +239,9 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Check if there's a generating presentation
+  const hasGeneratingPresentation = presentations.some(p => p.status === 'generating');
+
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern">
       {/* Header */}
@@ -216,6 +316,21 @@ export default function DashboardPage() {
         {error && (
           <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
             <p className="text-sm text-destructive">{error}</p>
+            <button 
+              onClick={() => setError(null)}
+              className="mt-2 text-xs text-destructive hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Info banner for generating presentations */}
+        {hasGeneratingPresentation && (
+          <div className="mb-6 rounded-lg border border-brand/20 bg-brand/10 p-4">
+            <p className="text-sm text-brand">
+              Your presentation is being generated. This may take a few minutes. You can refresh the page to check progress.
+            </p>
           </div>
         )}
 
@@ -262,5 +377,22 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
+        <div className="text-center">
+          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-border border-t-brand mx-auto" />
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Loading...
+          </p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

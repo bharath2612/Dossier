@@ -321,3 +321,67 @@ export async function handleDuplicatePresentation(req: Request, res: Response): 
     });
   }
 }
+
+// SSE endpoint for real-time presentation status updates
+export async function handlePresentationStream(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const userId = req.query.user_id as string | undefined;
+
+  if (!id) {
+    res.status(400).json({ error: 'Missing presentation ID' });
+    return;
+  }
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering for nginx
+  
+  // CORS headers for SSE
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  console.log(`[SSE] Client connected for presentation ${id}`);
+
+  // Send initial connection message
+  res.write(`: SSE connection established\n\n`);
+
+  // Poll and send updates
+  const pollInterval = setInterval(async () => {
+    try {
+      const presentation = await presentationStore.get(id, userId);
+
+      if (!presentation) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: 'Presentation not found' })}\n\n`);
+        clearInterval(pollInterval);
+        res.end();
+        return;
+      }
+
+      // Send presentation data
+      res.write(`data: ${JSON.stringify(presentation)}\n\n`);
+
+      // If generation is complete or failed, close the connection
+      if (presentation.status === 'completed' || presentation.status === 'failed') {
+        console.log(`[SSE] Presentation ${id} ${presentation.status}, closing connection`);
+        clearInterval(pollInterval);
+        res.write(`event: complete\ndata: ${JSON.stringify({ status: presentation.status })}\n\n`);
+        res.end();
+      }
+    } catch (error) {
+      console.error('[SSE] Error fetching presentation:', error);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: 'Failed to fetch presentation' })}\n\n`);
+      clearInterval(pollInterval);
+      res.end();
+    }
+  }, 5000); // Check every 5 seconds
+
+  // Clean up on client disconnect
+  req.on('close', () => {
+    console.log(`[SSE] Client disconnected for presentation ${id}`);
+    clearInterval(pollInterval);
+    res.end();
+  });
+}

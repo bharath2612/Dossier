@@ -6,6 +6,7 @@ exports.handleGetAllPresentations = handleGetAllPresentations;
 exports.handleUpdatePresentation = handleUpdatePresentation;
 exports.handleDeletePresentation = handleDeletePresentation;
 exports.handleDuplicatePresentation = handleDuplicatePresentation;
+exports.handlePresentationStream = handlePresentationStream;
 const uuid_1 = require("uuid");
 const slide_generator_1 = require("../agents/slide-generator");
 const presentation_store_1 = require("../services/presentation-store");
@@ -264,5 +265,59 @@ async function handleDuplicatePresentation(req, res) {
             message: error instanceof Error ? error.message : 'Unknown error',
         });
     }
+}
+// SSE endpoint for real-time presentation status updates
+async function handlePresentationStream(req, res) {
+    const { id } = req.params;
+    const userId = req.query.user_id;
+    if (!id) {
+        res.status(400).json({ error: 'Missing presentation ID' });
+        return;
+    }
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering for nginx
+    // CORS headers for SSE
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    console.log(`[SSE] Client connected for presentation ${id}`);
+    // Send initial connection message
+    res.write(`: SSE connection established\n\n`);
+    // Poll and send updates
+    const pollInterval = setInterval(async () => {
+        try {
+            const presentation = await presentation_store_1.presentationStore.get(id, userId);
+            if (!presentation) {
+                res.write(`event: error\ndata: ${JSON.stringify({ error: 'Presentation not found' })}\n\n`);
+                clearInterval(pollInterval);
+                res.end();
+                return;
+            }
+            // Send presentation data
+            res.write(`data: ${JSON.stringify(presentation)}\n\n`);
+            // If generation is complete or failed, close the connection
+            if (presentation.status === 'completed' || presentation.status === 'failed') {
+                console.log(`[SSE] Presentation ${id} ${presentation.status}, closing connection`);
+                clearInterval(pollInterval);
+                res.write(`event: complete\ndata: ${JSON.stringify({ status: presentation.status })}\n\n`);
+                res.end();
+            }
+        }
+        catch (error) {
+            console.error('[SSE] Error fetching presentation:', error);
+            res.write(`event: error\ndata: ${JSON.stringify({ error: 'Failed to fetch presentation' })}\n\n`);
+            clearInterval(pollInterval);
+            res.end();
+        }
+    }, 5000); // Check every 5 seconds
+    // Clean up on client disconnect
+    req.on('close', () => {
+        console.log(`[SSE] Client disconnected for presentation ${id}`);
+        clearInterval(pollInterval);
+        res.end();
+    });
 }
 //# sourceMappingURL=presentations.js.map

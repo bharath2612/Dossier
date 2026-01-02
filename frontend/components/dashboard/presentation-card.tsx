@@ -37,7 +37,7 @@ export function PresentationCard({
         : 'border-border hover:border-brand/50'
     }`}>
       {/* Card Content */}
-      <div className="cursor-pointer" onClick={onView}>
+      <div className={`cursor-pointer ${isGenerating ? 'opacity-70' : ''}`} onClick={onView}>
         {/* Title */}
         <div className="flex items-start gap-2">
           {isGenerating && (
@@ -50,7 +50,7 @@ export function PresentationCard({
 
         {/* Status Badge */}
         {isGenerating && (
-          <div className="mt-2 inline-block rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
+          <div className="mt-3 inline-block rounded-full bg-brand px-3 py-1.5 text-xs font-medium text-white shadow-sm animate-pulse">
             Generating...
           </div>
         )}
@@ -74,6 +74,11 @@ export function PresentationCard({
           {isGenerating ? 'Started' : 'Updated'} {timeAgo}
         </p>
       </div>
+      
+      {/* Generating overlay - subtle blur effect */}
+      {isGenerating && (
+        <div className="absolute inset-0 bg-background/5 backdrop-blur-[0.5px] rounded-lg pointer-events-none" />
+      )}
 
       {/* Actions Menu */}
       <div className="absolute right-4 top-4">

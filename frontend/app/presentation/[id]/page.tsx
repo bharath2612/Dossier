@@ -24,11 +24,13 @@ export default function PresentationPage() {
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    let pollInterval: NodeJS.Timeout | null = null;
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: NodeJS.Timeout | null = null;
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
     const fetchPresentation = async () => {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
         const response = await fetch(`${API_URL}/api/presentations/${presentationId}`);
 
         if (!response.ok) {
@@ -39,38 +41,100 @@ export default function PresentationPage() {
         const pres = data.presentation;
         setPresentation(pres);
 
-        // If presentation is still generating, poll for updates
+        // If presentation is still generating, use SSE for real-time updates
         if (pres.status === 'generating') {
-          console.log('Presentation is generating, will poll for updates...');
+          console.log('[SSE] Presentation is generating, connecting to SSE stream...');
           setLoading(false); // Show generating UI instead of loading spinner
           
-          // Poll every 3 seconds
-          if (!pollInterval) {
-            pollInterval = setInterval(async () => {
+          try {
+            // Connect to SSE endpoint
+            eventSource = new EventSource(`${API_URL}/api/presentations/${presentationId}/stream`);
+
+            eventSource.onopen = () => {
+              console.log('[SSE] Connection established');
+            };
+
+            eventSource.onmessage = (event) => {
               try {
-                const pollResponse = await fetch(`${API_URL}/api/presentations/${presentationId}`);
-                if (pollResponse.ok) {
-                  const pollData = await pollResponse.json();
-                  const updatedPres = pollData.presentation;
-                  setPresentation(updatedPres);
+                const updatedPres = JSON.parse(event.data);
+                console.log('[SSE] Received update:', updatedPres.status);
+                setPresentation(updatedPres);
+                
+                // If generation is complete or failed, close the connection
+                if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
+                  console.log(`[SSE] Presentation ${updatedPres.status}, closing connection`);
                   
-                  // Stop polling if generation is complete or failed
-                  if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
-                    console.log(`Presentation status: ${updatedPres.status}`);
-                    if (pollInterval) {
-                      clearInterval(pollInterval);
-                      pollInterval = null;
-                    }
-                    
-                    if (updatedPres.status === 'failed') {
-                      setError(updatedPres.error_message || 'Presentation generation failed');
-                    }
+                  if (updatedPres.status === 'failed') {
+                    setError(updatedPres.error_message || 'Presentation generation failed');
+                  }
+                  
+                  if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
                   }
                 }
-              } catch (pollError) {
-                console.error('Error polling presentation:', pollError);
+              } catch (parseError) {
+                console.error('[SSE] Error parsing message:', parseError);
               }
-            }, 3000);
+            };
+
+            eventSource.addEventListener('complete', () => {
+              console.log('[SSE] Generation complete event received');
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+            });
+
+            eventSource.addEventListener('error', (event) => {
+              console.error('[SSE] Connection error:', event);
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+            });
+
+            eventSource.onerror = (err) => {
+              console.error('[SSE] Error occurred:', err);
+              
+              // Fall back to polling if SSE fails
+              console.log('[SSE] Falling back to polling...');
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+              
+              // Use polling as fallback
+              if (!fallbackInterval) {
+                fallbackInterval = setInterval(async () => {
+                  try {
+                    const pollResponse = await fetch(`${API_URL}/api/presentations/${presentationId}`);
+                    if (pollResponse.ok) {
+                      const pollData = await pollResponse.json();
+                      const updatedPres = pollData.presentation;
+                      setPresentation(updatedPres);
+                      
+                      if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
+                        if (fallbackInterval) {
+                          clearInterval(fallbackInterval);
+                          fallbackInterval = null;
+                        }
+                        
+                        if (updatedPres.status === 'failed') {
+                          setError(updatedPres.error_message || 'Presentation generation failed');
+                        }
+                      }
+                    }
+                  } catch (pollError) {
+                    console.error('[Polling] Error:', pollError);
+                  }
+                }, 10000);
+              }
+            };
+          } catch (sseError) {
+            console.error('[SSE] Failed to create EventSource:', sseError);
+            // Fall back to initial polling setup
+            setLoading(false);
           }
         } else if (pres.status === 'failed') {
           setError(pres.error_message || 'Presentation generation failed');
@@ -88,10 +152,14 @@ export default function PresentationPage() {
 
     fetchPresentation();
 
-    // Cleanup: clear interval on unmount
+    // Cleanup: close SSE connection and clear intervals on unmount
     return () => {
-      if (pollInterval) {
-        clearInterval(pollInterval);
+      if (eventSource) {
+        console.log('[SSE] Cleaning up connection');
+        eventSource.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
       }
     };
   }, [presentationId]);

@@ -34,11 +34,13 @@ export function AuthCallbackClient() {
     // Check if we need to generate a presentation
     const shouldGenerate = sessionStorage.getItem('generate_after_auth');
     const citationStyle = sessionStorage.getItem('citation_style') || 'inline';
+    const theme = sessionStorage.getItem('theme') || 'minimal';
 
     if (shouldGenerate === 'true' && outline && currentDraft) {
       console.log('[AuthCallback] Starting presentation generation');
       sessionStorage.removeItem('generate_after_auth');
       sessionStorage.removeItem('citation_style');
+      sessionStorage.removeItem('theme');
       
       setStatus('Generating your presentation...');
       
@@ -46,6 +48,22 @@ export function AuthCallbackClient() {
         try {
           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
           
+          // First ensure user exists in database
+          const userResponse = await fetch(`${API_URL}/api/users/ensure`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: user.id,
+              email: user.email,
+            }),
+          });
+
+          if (!userResponse.ok) {
+            const errorData = await userResponse.json();
+            throw new Error(errorData.error || 'Failed to create user record');
+          }
+
+          // Generate presentation
           const response = await fetch(`${API_URL}/api/generate-presentation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -53,21 +71,25 @@ export function AuthCallbackClient() {
               draft_id: currentDraft.id,
               outline,
               citation_style: citationStyle,
-              theme: 'minimal',
+              theme: theme,
               user_id: user.id,
             }),
           });
 
           if (!response.ok) {
-            throw new Error('Failed to generate');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate presentation');
           }
 
           const result = await response.json();
           console.log('[AuthCallback] Success, going to presentation');
+          
+          // Redirect to presentation page which will show generating status
           router.replace(`/presentation/${result.presentation_id}`);
         } catch (err) {
           console.error('[AuthCallback] Generation failed:', err);
-          router.replace('/?error=generation_failed');
+          // On error, still go to dashboard where they can retry
+          router.replace('/dashboard?error=generation_failed');
         }
       };
 
@@ -79,10 +101,10 @@ export function AuthCallbackClient() {
   }, [user, loading, _hasHydrated, outline, currentDraft, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a]">
+    <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
       <div className="text-center">
-        <div className="mb-4 h-8 w-8 mx-auto animate-spin rounded-full border-2 border-white border-t-transparent" />
-        <p className="text-white">{status}</p>
+        <div className="mb-4 h-10 w-10 mx-auto animate-spin rounded-full border-2 border-border border-t-brand" />
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{status}</p>
       </div>
     </div>
   );
