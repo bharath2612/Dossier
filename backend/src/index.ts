@@ -1,8 +1,18 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { setGlobalDispatcher, Agent } from 'undici';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables with explicit path
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+setGlobalDispatcher(
+  new Agent({
+    connect: {
+      family: 4, // 🔑 FORCE IPv4
+    },
+  })
+);
 
 // Initialize Express app
 const app = express();

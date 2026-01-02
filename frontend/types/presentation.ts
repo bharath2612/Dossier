@@ -30,6 +30,7 @@ export interface Slide {
 
 export type CitationStyle = 'inline' | 'footnote' | 'speaker_notes';
 export type Theme = 'minimal' | 'corporate' | 'bold' | 'modern' | 'classic';
+export type PresentationStatus = 'generating' | 'completed' | 'failed';
 
 export interface Presentation {
   id: string;
@@ -38,6 +39,8 @@ export interface Presentation {
   slides: Slide[];
   citation_style: CitationStyle;
   theme: Theme;
+  status: PresentationStatus;
+  error_message?: string;
   created_at: string;
   updated_at: string;
 }

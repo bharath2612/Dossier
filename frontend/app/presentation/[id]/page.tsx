@@ -24,6 +24,8 @@ export default function PresentationPage() {
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+
     const fetchPresentation = async () => {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -34,16 +36,64 @@ export default function PresentationPage() {
         }
 
         const data = await response.json();
-        setPresentation(data.presentation);
+        const pres = data.presentation;
+        setPresentation(pres);
+
+        // If presentation is still generating, poll for updates
+        if (pres.status === 'generating') {
+          console.log('Presentation is generating, will poll for updates...');
+          setLoading(false); // Show generating UI instead of loading spinner
+          
+          // Poll every 3 seconds
+          if (!pollInterval) {
+            pollInterval = setInterval(async () => {
+              try {
+                const pollResponse = await fetch(`${API_URL}/api/presentations/${presentationId}`);
+                if (pollResponse.ok) {
+                  const pollData = await pollResponse.json();
+                  const updatedPres = pollData.presentation;
+                  setPresentation(updatedPres);
+                  
+                  // Stop polling if generation is complete or failed
+                  if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
+                    console.log(`Presentation status: ${updatedPres.status}`);
+                    if (pollInterval) {
+                      clearInterval(pollInterval);
+                      pollInterval = null;
+                    }
+                    
+                    if (updatedPres.status === 'failed') {
+                      setError(updatedPres.error_message || 'Presentation generation failed');
+                    }
+                  }
+                }
+              } catch (pollError) {
+                console.error('Error polling presentation:', pollError);
+              }
+            }, 3000);
+          }
+        } else if (pres.status === 'failed') {
+          setError(pres.error_message || 'Presentation generation failed');
+          setLoading(false);
+        } else {
+          // Presentation is completed
+          setLoading(false);
+        }
       } catch (err) {
         console.error('Error loading presentation:', err);
         setError(err instanceof Error ? err.message : 'Failed to load presentation');
-      } finally {
         setLoading(false);
       }
     };
 
     fetchPresentation();
+
+    // Cleanup: clear interval on unmount
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
   }, [presentationId]);
 
   // Keyboard navigation
@@ -249,6 +299,39 @@ export default function PresentationPage() {
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Loading presentation
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show generating state
+  if (presentation && presentation.status === 'generating') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
+        <div className="text-center max-w-md">
+          <div className="mb-6 h-16 w-16 animate-spin rounded-full border-4 border-border border-t-brand mx-auto" />
+          <h2 className="text-2xl font-semibold mb-3 text-foreground">
+            Generating Your Presentation
+          </h2>
+          <p className="text-muted-foreground mb-2">
+            Our AI is creating beautiful slides for you...
+          </p>
+          <p className="font-mono text-xs text-muted-foreground">
+            This usually takes 1-2 minutes
+          </p>
+          <div className="mt-8 p-4 rounded-lg border border-border bg-card/50">
+            <p className="text-sm text-muted-foreground">
+              💡 <strong>Tip:</strong> You can safely leave this page. Your presentation will be available in your dashboard once complete.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="mt-6"
+            onClick={() => router.push('/dashboard')}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Go to Dashboard
+          </Button>
         </div>
       </div>
     );

@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk';
 // Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
+  maxRetries: 2,
+  timeout: 60000, // 60 seconds
 });
 
 export default anthropic;

@@ -139,9 +139,10 @@ export function OutlineEditor({ onBack }: OutlineEditorProps) {
       }
 
       const data = await response.json();
-      console.log('Presentation generated:', data);
+      console.log('Presentation generation started:', data);
 
-      // Navigate to presentation viewer (use replace to avoid back-button issues)
+      // Navigate to presentation viewer immediately (use replace to avoid back-button issues)
+      // The presentation page will show a loading state and poll for completion
       router.replace(`/presentation/${data.presentation_id}`);
     } catch (err) {
       console.error('Generation error:', err);

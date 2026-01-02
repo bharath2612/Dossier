@@ -6,9 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.estimateTokens = estimateTokens;
 exports.callClaude = callClaude;
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
-// Initialize Anthropic client
+// Initialize Anthropic client with custom fetch that handles SSL
 const anthropic = new sdk_1.default({
     apiKey: process.env.ANTHROPIC_API_KEY || '',
+    // Add timeout and better error handling
+    maxRetries: 2,
+    timeout: 60000, // 60 seconds
 });
 exports.default = anthropic;
 // Helper function to count tokens (rough estimate)

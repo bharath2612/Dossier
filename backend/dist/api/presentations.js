@@ -10,6 +10,55 @@ const uuid_1 = require("uuid");
 const slide_generator_1 = require("../agents/slide-generator");
 const presentation_store_1 = require("../services/presentation-store");
 const draft_store_1 = require("../services/draft-store");
+// Background slide generation (fire and forget)
+async function generateSlidesInBackground(presentationId, draft_id, outline, citation_style, theme, user_id) {
+    try {
+        console.log(`[Background] Starting slide generation for presentation ${presentationId}`);
+        // Get the original draft to retrieve prompt and research data
+        const draft = await draft_store_1.draftStore.get(draft_id);
+        // Generate slides using Slide Generator Agent
+        const slidesResult = await (0, slide_generator_1.generateSlides)({
+            outlineSlides: outline.slides,
+            citationStyle: citation_style,
+            researchData: null, // TODO: Store research data in draft for citation context
+        });
+        if (!slidesResult.success || !slidesResult.data) {
+            console.error(`[Background] Slide generation failed for ${presentationId}:`, slidesResult.error);
+            // Update presentation with error status
+            await presentation_store_1.presentationStore.update(presentationId, {
+                status: 'failed',
+                error_message: slidesResult.error || 'Slide generation failed',
+            }, user_id);
+            return;
+        }
+        console.log(`[Background] Slides generated successfully for ${presentationId}`);
+        // Update presentation with generated slides
+        await presentation_store_1.presentationStore.update(presentationId, {
+            slides: slidesResult.data,
+            status: 'completed',
+            token_usage: {
+                preprocessor: 0,
+                research: 0,
+                outline: 0,
+                slides: slidesResult.token_usage || 0,
+                total: slidesResult.token_usage || 0,
+            },
+        }, user_id);
+        console.log(`[Background] Presentation ${presentationId} completed and saved`);
+    }
+    catch (error) {
+        console.error(`[Background] Error generating slides for ${presentationId}:`, error);
+        try {
+            await presentation_store_1.presentationStore.update(presentationId, {
+                status: 'failed',
+                error_message: error instanceof Error ? error.message : 'Unknown error',
+            }, user_id);
+        }
+        catch (updateError) {
+            console.error(`[Background] Failed to update error status:`, updateError);
+        }
+    }
+}
 // Generate full presentation from outline
 async function handleGeneratePresentation(req, res) {
     try {
@@ -26,24 +75,11 @@ async function handleGeneratePresentation(req, res) {
             });
             return;
         }
-        // Get the original draft to retrieve prompt and research data
+        // Get the original draft to retrieve prompt
         const draft = await draft_store_1.draftStore.get(draft_id);
-        console.log(`Generating presentation for user ${user_id}...`);
-        // Generate slides using Slide Generator Agent
-        const slidesResult = await (0, slide_generator_1.generateSlides)({
-            outlineSlides: outline.slides,
-            citationStyle: citation_style,
-            researchData: null, // TODO: Store research data in draft for citation context
-        });
-        if (!slidesResult.success || !slidesResult.data) {
-            res.status(500).json({
-                error: 'Slide generation failed',
-                message: slidesResult.error,
-            });
-            return;
-        }
         const presentationId = (0, uuid_1.v4)();
-        // Create presentation object
+        console.log(`Creating presentation ${presentationId} with status 'generating' for user ${user_id}`);
+        // Create presentation object with "generating" status and empty slides
         const presentation = {
             id: presentationId,
             user_id,
@@ -51,23 +87,24 @@ async function handleGeneratePresentation(req, res) {
             prompt: draft?.prompt || '',
             enhanced_prompt: draft?.enhanced_prompt,
             outline,
-            slides: slidesResult.data,
+            slides: [], // Empty initially
             citation_style,
             theme,
+            status: 'generating',
             token_usage: {
                 preprocessor: 0,
                 research: 0,
                 outline: 0,
-                slides: slidesResult.token_usage || 0,
-                total: slidesResult.token_usage || 0,
+                slides: 0,
+                total: 0,
             },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
-        // Save to database
+        // Save to database with "generating" status
         try {
             await presentation_store_1.presentationStore.create(presentation);
-            console.log(`Presentation saved successfully with ID: ${presentationId}`);
+            console.log(`Presentation ${presentationId} created with status 'generating'`);
         }
         catch (saveError) {
             console.error('Failed to save presentation:', saveError);
@@ -77,14 +114,14 @@ async function handleGeneratePresentation(req, res) {
             });
             return;
         }
-        // Return response
+        // Start background slide generation (fire and forget)
+        generateSlidesInBackground(presentationId, draft_id, outline, citation_style, theme, user_id).catch((error) => {
+            console.error(`[Background] Unhandled error in background generation:`, error);
+        });
+        // Return immediately with presentation ID and generating status
         res.json({
             presentation_id: presentationId,
-            slides: slidesResult.data,
-            token_usage: {
-                slides: slidesResult.token_usage || 0,
-                total: slidesResult.token_usage || 0,
-            },
+            status: 'generating',
         });
     }
     catch (error) {

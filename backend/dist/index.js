@@ -5,8 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
-// Load environment variables
-dotenv_1.default.config();
+const path_1 = __importDefault(require("path"));
+// Load environment variables with explicit path
+dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
 // Initialize Express app
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 8080;
@@ -94,14 +95,20 @@ app.use((err, _req, res, _next) => {
     });
 });
 // Start server (only in non-serverless environment)
-if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
+if (!process.env.VERCEL) {
+    const server = app.listen(PORT, () => {
         console.log(`🚀 Dossier AI Backend running on port ${PORT}`);
         console.log(`📍 Health check: http://localhost:${PORT}/health`);
         console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+        server.close(() => {
+            console.log('Server closed');
+        });
+    });
 }
-// Export for Vercel
+// Export for Vercel - both ES6 and CommonJS
 exports.default = app;
 module.exports = app;
 //# sourceMappingURL=index.js.map

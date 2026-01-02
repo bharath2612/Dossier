@@ -26,6 +26,7 @@ export interface TokenUsage {
     slides: number;
     total: number;
 }
+export type PresentationStatus = 'generating' | 'completed' | 'failed';
 export interface Presentation {
     id: string;
     user_id: string;
@@ -36,6 +37,8 @@ export interface Presentation {
     slides: Slide[];
     citation_style: CitationStyle;
     theme: Theme;
+    status: PresentationStatus;
+    error_message?: string;
     token_usage?: TokenUsage;
     created_at: string;
     updated_at: string;
@@ -49,8 +52,9 @@ export interface GeneratePresentationRequest {
 }
 export interface GeneratePresentationResponse {
     presentation_id: string;
-    slides: Slide[];
-    token_usage: {
+    status: PresentationStatus;
+    slides?: Slide[];
+    token_usage?: {
         slides: number;
         total: number;
     };
@@ -60,5 +64,8 @@ export interface UpdatePresentationRequest {
     slides?: Slide[];
     theme?: Theme;
     citation_style?: CitationStyle;
+    status?: PresentationStatus;
+    error_message?: string;
+    token_usage?: TokenUsage;
 }
 //# sourceMappingURL=presentation.d.ts.map

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Presentation } from '@/types/presentation';
-import { MoreVertical, Eye, Edit, Copy, Trash2 } from 'lucide-react';
+import { MoreVertical, Eye, Edit, Copy, Trash2, Loader2 } from 'lucide-react';
 
 interface PresentationCardProps {
   presentation: Presentation;
@@ -25,19 +25,44 @@ export function PresentationCard({
   const slideCount = presentation.slides.length;
   const updatedAt = new Date(presentation.updated_at);
   const timeAgo = formatDistanceToNow(updatedAt, { addSuffix: true });
+  const isGenerating = presentation.status === 'generating';
+  const isFailed = presentation.status === 'failed';
 
   return (
-    <div className="group relative rounded-lg border border-border bg-card p-6 transition-all hover:border-brand/50">
+    <div className={`group relative rounded-lg border bg-card p-6 transition-all ${
+      isGenerating 
+        ? 'border-brand/50 bg-brand/5' 
+        : isFailed 
+        ? 'border-destructive/50 bg-destructive/5'
+        : 'border-border hover:border-brand/50'
+    }`}>
       {/* Card Content */}
       <div className="cursor-pointer" onClick={onView}>
         {/* Title */}
-        <h3 className="text-lg font-medium text-foreground line-clamp-2">
-          {presentation.title}
-        </h3>
+        <div className="flex items-start gap-2">
+          {isGenerating && (
+            <Loader2 className="h-5 w-5 animate-spin text-brand flex-shrink-0 mt-0.5" />
+          )}
+          <h3 className="text-lg font-medium text-foreground line-clamp-2">
+            {presentation.title}
+          </h3>
+        </div>
+
+        {/* Status Badge */}
+        {isGenerating && (
+          <div className="mt-2 inline-block rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
+            Generating...
+          </div>
+        )}
+        {isFailed && (
+          <div className="mt-2 inline-block rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+            Generation Failed
+          </div>
+        )}
 
         {/* Metadata */}
         <div className="mt-3 flex items-center space-x-3 font-mono text-xs text-muted-foreground">
-          <span>{slideCount} slides</span>
+          <span>{slideCount} {isGenerating ? 'slides planned' : 'slides'}</span>
           <span className="text-border">|</span>
           <span className="capitalize">{presentation.citation_style}</span>
           <span className="text-border">|</span>
@@ -45,7 +70,9 @@ export function PresentationCard({
         </div>
 
         {/* Updated time */}
-        <p className="mt-4 text-xs text-muted-foreground">Updated {timeAgo}</p>
+        <p className="mt-4 text-xs text-muted-foreground">
+          {isGenerating ? 'Started' : 'Updated'} {timeAgo}
+        </p>
       </div>
 
       {/* Actions Menu */}
@@ -88,7 +115,12 @@ export function PresentationCard({
                   setShowMenu(false);
                   onEdit();
                 }}
-                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                disabled={isGenerating}
+                className={`flex w-full items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                  isGenerating 
+                    ? 'text-muted-foreground/50 cursor-not-allowed' 
+                    : 'text-foreground hover:bg-secondary'
+                }`}
               >
                 <Edit className="h-4 w-4 text-muted-foreground" />
                 <span>Edit</span>
@@ -100,7 +132,12 @@ export function PresentationCard({
                   setShowMenu(false);
                   onDuplicate();
                 }}
-                className="flex w-full items-center space-x-3 px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                disabled={isGenerating}
+                className={`flex w-full items-center space-x-3 px-4 py-2 text-sm transition-colors ${
+                  isGenerating 
+                    ? 'text-muted-foreground/50 cursor-not-allowed' 
+                    : 'text-foreground hover:bg-secondary'
+                }`}
               >
                 <Copy className="h-4 w-4 text-muted-foreground" />
                 <span>Duplicate</span>

@@ -109,6 +109,8 @@ class PresentationStore {
                 slides: newPresentation.slides,
                 citation_style: newPresentation.citation_style,
                 theme: newPresentation.theme,
+                status: newPresentation.status,
+                error_message: newPresentation.error_message,
                 token_usage: newPresentation.token_usage,
                 created_at: newPresentation.created_at,
                 updated_at: newPresentation.updated_at,

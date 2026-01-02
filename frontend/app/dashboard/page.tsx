@@ -37,6 +37,13 @@ export default function DashboardPage() {
     console.log('[Dashboard] User found, fetching presentations...');
     // User exists, fetch presentations
     fetchPresentations();
+
+    // Poll for updates if any presentations are generating
+    const pollInterval = setInterval(() => {
+      fetchPresentations();
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, router]);
 
