@@ -21,7 +21,9 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
         zIndex: getNextZIndex(widgets),
         data: {
           level: 'h1',
-          segments: Array.isArray(slide.title) ? slide.title : [{ text: titleText }],
+          segments: Array.isArray(slide.title)
+            ? slide.title.map(seg => ({ ...seg, textLevel: 'h1' as const }))
+            : [{ text: titleText, textLevel: 'h1' as const }],
         },
       };
       widgets.push(titleWidget);
@@ -46,10 +48,10 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
         zIndex: getNextZIndex(widgets),
         data: {
           segments: typeof bullet === 'string'
-            ? [{ text: bullet }]
+            ? [{ text: bullet, textLevel: 'text' as const }]
             : 'segments' in bullet
-            ? bullet.segments
-            : [{ text: bulletText }],
+            ? bullet.segments.map(seg => ({ ...seg, textLevel: 'text' as const }))
+            : [{ text: bulletText, textLevel: 'text' as const }],
         },
       };
       widgets.push(textWidget);

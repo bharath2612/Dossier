@@ -8,6 +8,7 @@ import {
   getSelectionFormat,
   getSegmentsLength,
   FONT_SIZE_MAP,
+  TEXT_LEVEL_MAP,
 } from '@/lib/utils/rich-text';
 
 interface RichTextEditorProps {
@@ -51,7 +52,12 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
         const styles: string[] = [];
         if (segment.color) styles.push(`color: ${segment.color}`);
         if (segment.backgroundColor) styles.push(`background-color: ${segment.backgroundColor}`);
-        if (segment.fontSize) {
+
+        // NEW: Use textLevel (prioritize over deprecated fontSize)
+        if (segment.textLevel) {
+          styles.push(`font-size: ${TEXT_LEVEL_MAP[segment.textLevel]}px`);
+        } else if (segment.fontSize) {
+          // Fallback to deprecated fontSize for backward compatibility
           styles.push(`font-size: ${FONT_SIZE_MAP[segment.fontSize]}px`);
         }
         // Note: text-align is handled at the container level, not per-segment
@@ -118,11 +124,11 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
       const fontSize = computedStyle.fontSize;
       if (fontSize) {
         const size = parseInt(fontSize);
-        // Map pixel size to FontSize enum
-        if (size <= 16) newFormat.fontSize = 'small';
-        else if (size <= 22) newFormat.fontSize = 'medium';
-        else if (size <= 28) newFormat.fontSize = 'large';
-        else newFormat.fontSize = 'extra-large';
+        // NEW: Map pixel size to TextLevel enum (Notion-style)
+        if (size >= 42) newFormat.textLevel = 'h1';       // ~48px
+        else if (size >= 32) newFormat.textLevel = 'h2';   // ~36px
+        else if (size >= 24) newFormat.textLevel = 'h3';   // ~28px
+        else newFormat.textLevel = 'text';                  // ~16px
       }
 
       // Note: text-align is handled at the container level, not parsed from inline elements
@@ -402,6 +408,11 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
     ? segments[0].alignment
     : 'left';
 
+  // Get text level from segments (use first segment's level or default to 'text')
+  const textLevel = segments.length > 0 && segments[0].textLevel
+    ? segments[0].textLevel
+    : 'text';
+
   return (
     <div
       ref={editorRef}
@@ -418,6 +429,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
         outline: 'none',
         minHeight: '1.5em',
         textAlign: alignment,
+        fontSize: `${TEXT_LEVEL_MAP[textLevel]}px`,  // Apply base font size from textLevel
         ...style,
       }}
       suppressContentEditableWarning

@@ -120,7 +120,7 @@ function SortableThumbnail({
         <div className="absolute inset-x-0 top-0 rounded-t bg-gradient-to-b from-black/60 to-transparent px-2 py-1">
           <p
             className="truncate text-[10px] font-medium text-white"
-            title={typeof slide.title === 'string' ? slide.title : slide.title.map(s => s.text).join('')}
+            title={typeof slide.title === 'string' ? slide.title : (Array.isArray(slide.title) ? slide.title.map((s: any) => s.text).join('') : slide.title)}
           >
             {typeof slide.title === 'string' ? slide.title : slide.title.map(s => s.text).join('')}
           </p>

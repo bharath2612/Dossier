@@ -61,7 +61,7 @@ export function CardWidgetComponent({ widget, onUpdate, onSelectionChange, theme
           placeholder="Card title..."
           disabled={!isEditing}
           style={{
-            fontSize: '18px',
+            fontSize: '28px',  // H3 size for card titles (TEXT_LEVEL_MAP['h3'])
             fontWeight: 'bold',
             color: textColor,
           }}
@@ -78,7 +78,7 @@ export function CardWidgetComponent({ widget, onUpdate, onSelectionChange, theme
           placeholder="Card content..."
           disabled={!isEditing}
           style={{
-            fontSize: '14px',
+            fontSize: '16px',  // Standard text size (TEXT_LEVEL_MAP['text'])
             color: textColor,
           }}
         />

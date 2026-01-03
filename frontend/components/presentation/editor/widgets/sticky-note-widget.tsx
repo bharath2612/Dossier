@@ -54,7 +54,7 @@ export function StickyNoteWidgetComponent({ widget, onUpdate, onSelectionChange,
         placeholder="Sticky note..."
         disabled={!isEditing}
         style={{
-          fontSize: '14px',
+          fontSize: '16px',  // Standard text size (TEXT_LEVEL_MAP['text'])
           color: textColor,
           minHeight: '100%',
         }}

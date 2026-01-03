@@ -66,6 +66,8 @@ export interface Draft {
   updated_at: string;
 }
 
+export type PresentationStatus = 'generating' | 'completed' | 'failed';
+
 export interface Presentation {
   id: string;
   user_id: string;
@@ -76,6 +78,8 @@ export interface Presentation {
   slides: Slide[];
   citation_style: CitationStyle;
   theme: Theme;
+  status: PresentationStatus;
+  error_message?: string;
   token_usage?: TokenUsage;
   created_at: string;
   updated_at: string;

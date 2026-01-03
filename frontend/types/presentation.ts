@@ -18,9 +18,12 @@ export interface SlideImage {
 }
 
 // Rich Text Types (previously referenced but not defined)
-export type FontSize = 'small' | 'medium' | 'large' | 'extra-large';
-export type TextStyle = 'heading' | 'subtitle' | 'body' | 'quote';
+export type FontSize = 'small' | 'medium' | 'large' | 'extra-large'; // DEPRECATED - kept for backward compatibility
+export type TextStyle = 'heading' | 'subtitle' | 'body' | 'quote'; // DEPRECATED - kept for backward compatibility
 export type TextAlignment = 'left' | 'center' | 'right';
+
+// NEW: Unified text sizing system (Notion-style)
+export type TextLevel = 'h1' | 'h2' | 'h3' | 'text';
 
 export interface TextSegment {
   text: string;
@@ -30,9 +33,10 @@ export interface TextSegment {
   strikethrough?: boolean;
   link?: string;
   color?: string;
-  backgroundColor?: string;  // NEW - for text highlighting
-  fontSize?: FontSize;
-  textStyle?: TextStyle;
+  backgroundColor?: string;
+  fontSize?: FontSize; // DEPRECATED - use textLevel instead
+  textStyle?: TextStyle; // DEPRECATED - use textLevel instead
+  textLevel?: TextLevel; // NEW - replaces fontSize and textStyle
   alignment?: TextAlignment;
 }
 

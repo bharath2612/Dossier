@@ -61,7 +61,7 @@ export function createDefaultWidget(type: WidgetType, widgets: ContentBlock[] = 
         type: 'text',
         position,
         zIndex,
-        data: { segments: [{ text: 'Enter text here' }] },
+        data: { segments: [{ text: 'Enter text here', textLevel: 'text' }] },
       } as TextWidget;
 
     case 'heading': {
@@ -72,7 +72,7 @@ export function createDefaultWidget(type: WidgetType, widgets: ContentBlock[] = 
         zIndex,
         data: {
           level: 'h2' as HeadingLevel,
-          segments: [{ text: 'Heading' }],
+          segments: [{ text: 'Heading', textLevel: 'h2' }],
         },
       } as HeadingWidget;
     }
@@ -84,8 +84,8 @@ export function createDefaultWidget(type: WidgetType, widgets: ContentBlock[] = 
         position,
         zIndex,
         data: {
-          title: [{ text: 'Card Title', bold: true }],
-          body: [{ text: 'Card content goes here' }],
+          title: [{ text: 'Card Title', bold: true, textLevel: 'h3' }],
+          body: [{ text: 'Card content goes here', textLevel: 'text' }],
           backgroundColor: '#ffffff',
           borderColor: '#e5e7eb',
         },
@@ -98,7 +98,7 @@ export function createDefaultWidget(type: WidgetType, widgets: ContentBlock[] = 
         position,
         zIndex,
         data: {
-          segments: [{ text: 'Sticky note' }],
+          segments: [{ text: 'Sticky note', textLevel: 'text' }],
           color: '#fef08a', // Yellow
           rotation: 2,
         },

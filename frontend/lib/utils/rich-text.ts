@@ -1,4 +1,4 @@
-import type { TextSegment, RichTextBullet, Slide, LegacySlide, FontSize, TextStyle, TextAlignment } from '@/types/presentation';
+import type { TextSegment, RichTextBullet, Slide, LegacySlide, FontSize, TextStyle, TextAlignment, TextLevel } from '@/types/presentation';
 
 /**
  * Migration helper: Convert legacy string-based slide to rich text format
@@ -94,6 +94,7 @@ export function mergeSegments(segments: TextSegment[]): TextSegment[] {
       current.backgroundColor === next.backgroundColor &&
       current.fontSize === next.fontSize &&
       current.textStyle === next.textStyle &&
+      current.textLevel === next.textLevel &&
       current.alignment === next.alignment
     ) {
       // Merge with current segment
@@ -152,6 +153,7 @@ export function getSelectionFormat(
       backgroundColor: segments[0].backgroundColor,
       fontSize: segments[0].fontSize,
       textStyle: segments[0].textStyle,
+      textLevel: segments[0].textLevel,
       alignment: segments[0].alignment,
     } : {};
   }
@@ -175,6 +177,7 @@ export function getSelectionFormat(
         backgroundColor: segment.backgroundColor,
         fontSize: segment.fontSize,
         textStyle: segment.textStyle,
+        textLevel: segment.textLevel,
         alignment: segment.alignment,
       });
     }
@@ -198,6 +201,7 @@ export function getSelectionFormat(
     f.backgroundColor === firstFormat.backgroundColor &&
     f.fontSize === firstFormat.fontSize &&
     f.textStyle === firstFormat.textStyle &&
+    f.textLevel === firstFormat.textLevel &&
     f.alignment === firstFormat.alignment
   );
 
@@ -212,13 +216,27 @@ export function getSegmentsLength(segments: TextSegment[]): number {
 }
 
 /**
- * Font size mapping
+ * Font size mapping (DEPRECATED - kept for backward compatibility)
  */
 export const FONT_SIZE_MAP: Record<FontSize, number> = {
   small: 14,
   medium: 18,
   large: 24,
   'extra-large': 32,
+};
+
+/**
+ * NEW: Unified text level mapping (Notion-style)
+ * H1 = 48px (Heading 1)
+ * H2 = 36px (Heading 2)
+ * H3 = 28px (Heading 3)
+ * Text = 16px (Normal paragraph text)
+ */
+export const TEXT_LEVEL_MAP: Record<TextLevel, number> = {
+  h1: 48,
+  h2: 36,
+  h3: 28,
+  text: 16,
 };
 
 /**
