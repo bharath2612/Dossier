@@ -1,4 +1,4 @@
-import type { TextSegment, RichTextBullet, Slide, LegacySlide, FontSize, TextStyle, TextAlignment, TextLevel } from '@/types/presentation';
+import type { TextSegment, RichTextBullet, Slide, FontSize, TextStyle, TextAlignment, TextLevel } from '@/types/presentation';
 
 /**
  * Migration helper: Convert legacy string-based slide to rich text format
