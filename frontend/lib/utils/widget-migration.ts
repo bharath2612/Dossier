@@ -10,8 +10,7 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
 
   // Migrate title to Heading H1 widget
   if (slide.title && slide.title.trim()) {
-    const titleText = typeof slide.title === 'string' ? slide.title :
-      Array.isArray(slide.title) ? slide.title.map(s => s.text).join('') : '';
+    const titleText = slide.title;
 
     if (titleText.trim()) {
       const titleWidget: HeadingWidget = {
@@ -21,9 +20,7 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
         zIndex: getNextZIndex(widgets),
         data: {
           level: 'h1',
-          segments: Array.isArray(slide.title)
-            ? slide.title.map(seg => ({ ...seg, textLevel: 'h1' as const }))
-            : [{ text: titleText, textLevel: 'h1' as const }],
+          segments: [{ text: titleText, textLevel: 'h1' as const }],
         },
       };
       widgets.push(titleWidget);
