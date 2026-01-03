@@ -31,10 +31,9 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
   // Migrate body bullets to Text widgets
   if (Array.isArray(slide.body) && slide.body.length > 0) {
     slide.body.forEach((bullet) => {
-      if (!bullet) return;
+      if (!bullet || typeof bullet !== 'string') return;
 
-      const bulletText = typeof bullet === 'string' ? bullet :
-        'segments' in bullet ? bullet.segments.map(s => s.text).join('') : '';
+      const bulletText = bullet;
 
       if (!bulletText.trim()) return;
 
@@ -44,11 +43,7 @@ export function migrateLegacySlideToWidgets(slide: Slide): ContentBlock[] {
         position: { x: 15, y: yOffset, width: 75, height: 8 },
         zIndex: getNextZIndex(widgets),
         data: {
-          segments: typeof bullet === 'string'
-            ? [{ text: bullet, textLevel: 'text' as const }]
-            : 'segments' in bullet
-            ? bullet.segments.map(seg => ({ ...seg, textLevel: 'text' as const }))
-            : [{ text: bulletText, textLevel: 'text' as const }],
+          segments: [{ text: bulletText, textLevel: 'text' as const }],
         },
       };
       widgets.push(textWidget);
