@@ -7,8 +7,6 @@ export function migrateSlideToRichText(slide: Slide): Slide {
   // Slide type always has string title, so just return as-is
   // This function is kept for backward compatibility but no longer migrates
   return slide;
-    body: migratedBody,
-  };
 }
 
 /**
