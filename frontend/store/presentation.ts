@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Presentation, Slide, Theme, CitationStyle, ContentBlock } from './types';
+import type { Presentation, Slide, Theme, CitationStyle } from './types';
 
 interface PresentationStore {
   // State
