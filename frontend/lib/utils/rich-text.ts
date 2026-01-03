@@ -3,21 +3,10 @@ import type { TextSegment, RichTextBullet, Slide, FontSize, TextStyle, TextAlign
 /**
  * Migration helper: Convert legacy string-based slide to rich text format
  */
-export function migrateSlideToRichText(slide: LegacySlide | Slide): Slide {
-  // If already migrated, return as-is
-  if (Array.isArray(slide.title) && Array.isArray(slide.body) && slide.body.length > 0 && typeof slide.body[0] !== 'string') {
-    return slide as Slide;
-  }
-
-  const migratedBody = Array.isArray(slide.body) && slide.body.length > 0 && typeof slide.body[0] === 'string'
-    ? (slide.body as string[]).map((text: string) => ({ segments: [{ text }] }))
-    : slide.body;
-
-  return {
-    ...slide,
-    title: typeof slide.title === 'string' 
-      ? [{ text: slide.title }]
-      : slide.title,
+export function migrateSlideToRichText(slide: Slide): Slide {
+  // Slide type always has string title, so just return as-is
+  // This function is kept for backward compatibility but no longer migrates
+  return slide;
     body: migratedBody,
   };
 }
