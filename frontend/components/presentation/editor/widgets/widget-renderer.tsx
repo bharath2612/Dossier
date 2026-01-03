@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Trash2, Move } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { pixelsToPosition, constrainPosition } from '@/lib/utils/widget-utils';
 import { TextWidgetComponent } from './text-widget';
@@ -46,13 +46,38 @@ export function WidgetRenderer({
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [originalPosition, setOriginalPosition] = useState<WidgetPosition>(widget.position);
+  const [dragStartPosition, setDragStartPosition] = useState<{ x: number; y: number } | null>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
-  // Handle drag start
-  const handleDragStart = (e: React.MouseEvent) => {
+  // Check if the target is an editable element (input, textarea, contentEditable)
+  const isEditableElement = (target: EventTarget | null): boolean => {
+    if (!target || !(target instanceof HTMLElement)) return false;
+    
+    const tagName = target.tagName.toLowerCase();
+    if (tagName === 'input' || tagName === 'textarea') return true;
+    if (target.isContentEditable) return true;
+    
+    // Check if it's within a contentEditable element
+    let parent = target.parentElement;
+    while (parent) {
+      if (parent.isContentEditable) return true;
+      parent = parent.parentElement;
+    }
+    
+    return false;
+  };
+
+  // Handle drag start on widget
+  const handleWidgetMouseDown = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on editable content or resize handles
+    if (isEditableElement(e.target)) return;
+    if ((e.target as HTMLElement).closest('[data-resize-handle]')) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    
     if (!isSelected) return;
+    
     e.stopPropagation();
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
+    setDragStartPosition({ x: e.clientX, y: e.clientY });
     setOriginalPosition(widget.position);
   };
 
@@ -66,11 +91,29 @@ export function WidgetRenderer({
     setOriginalPosition(widget.position);
   };
 
-  // Handle mouse move
+  // Handle mouse move - check for drag initiation and handle dragging/resizing
   useEffect(() => {
-    if (!isDragging && !isResizing) return;
+    if (!dragStartPosition && !isDragging && !isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      // If we have a drag start position but haven't started dragging yet, check if we should start
+      if (dragStartPosition && !isDragging && !isResizing) {
+        const deltaX = Math.abs(e.clientX - dragStartPosition.x);
+        const deltaY = Math.abs(e.clientY - dragStartPosition.y);
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // Start dragging if mouse moved more than 5px
+        if (distance > 5) {
+          setIsDragging(true);
+          setDragStart({ x: dragStartPosition.x, y: dragStartPosition.y });
+          setDragStartPosition(null);
+        } else {
+          return; // Wait for more movement
+        }
+      }
+
+      if (!isDragging && !isResizing) return;
+
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
 
@@ -135,6 +178,7 @@ export function WidgetRenderer({
       setIsDragging(false);
       setIsResizing(false);
       setResizeHandle(null);
+      setDragStartPosition(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -144,7 +188,7 @@ export function WidgetRenderer({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, isResizing, resizeHandle, dragStart, originalPosition, onUpdate, canvasSize]);
+  }, [dragStartPosition, isDragging, isResizing, resizeHandle, dragStart, originalPosition, onUpdate, canvasSize]);
 
   // Render the appropriate widget based on type
   const renderWidget = () => {
@@ -278,6 +322,7 @@ export function WidgetRenderer({
 
   return (
     <div
+      ref={widgetRef}
       className={`group relative h-full w-full ${
         isSelected ? 'ring-2 ring-brand ring-offset-2 ring-offset-background' : ''
       }`}
@@ -289,11 +334,9 @@ export function WidgetRenderer({
           onSelect();
         }
       }}
-      onMouseDown={(e) => {
-        console.log('[WidgetRenderer] Mouse down on widget wrapper');
-      }}
+      onMouseDown={handleWidgetMouseDown}
       style={{
-        cursor: isSelected ? 'default' : 'pointer',
+        cursor: isSelected ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
         userSelect: isDragging ? 'none' : 'auto',
       }}
     >
@@ -303,24 +346,6 @@ export function WidgetRenderer({
       {/* Selection Controls (visible when selected) */}
       {isSelected && (
         <>
-          {/* Drag Handle */}
-          <div className="absolute -left-2 -top-2 z-10">
-            <Button
-              variant="secondary"
-              size="icon-sm"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleDragStart(e);
-              }}
-              className="h-6 w-6 rounded-full shadow-lg cursor-grab active:cursor-grabbing"
-              style={{
-                cursor: isDragging ? 'grabbing' : 'grab',
-              }}
-            >
-              <Move className="h-3 w-3" />
-            </Button>
-          </div>
-
           {/* Delete Button */}
           <div className="absolute -right-2 -top-2 z-10">
             <Button
@@ -338,34 +363,42 @@ export function WidgetRenderer({
 
           {/* Resize Handles */}
           <div
+            data-resize-handle
             className="absolute -bottom-1 -right-1 h-3 w-3 cursor-se-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'se')}
           />
           <div
+            data-resize-handle
             className="absolute -bottom-1 -left-1 h-3 w-3 cursor-sw-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'sw')}
           />
           <div
+            data-resize-handle
             className="absolute -top-1 -right-1 h-3 w-3 cursor-ne-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'ne')}
           />
           <div
+            data-resize-handle
             className="absolute -top-1 -left-1 h-3 w-3 cursor-nw-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'nw')}
           />
           <div
+            data-resize-handle
             className="absolute -top-1 left-1/2 h-3 w-3 -translate-x-1/2 cursor-n-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'n')}
           />
           <div
+            data-resize-handle
             className="absolute -bottom-1 left-1/2 h-3 w-3 -translate-x-1/2 cursor-s-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 's')}
           />
           <div
+            data-resize-handle
             className="absolute -left-1 top-1/2 h-3 w-3 -translate-y-1/2 cursor-w-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'w')}
           />
           <div
+            data-resize-handle
             className="absolute -right-1 top-1/2 h-3 w-3 -translate-y-1/2 cursor-e-resize rounded-full bg-brand border-2 border-background"
             onMouseDown={(e) => handleResizeStart(e, 'e')}
           />

@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { SlideCanvas } from '@/components/presentation/editor/slide-canvas';
 import { SlideViewer } from '@/components/presentation/slide-viewer';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { getTheme } from '@/lib/themes';
+import { usePresentationStore } from '@/store/presentation';
+import { AutoSaveIndicator } from '@/components/outline/auto-save-indicator';
 import type { Presentation, Slide } from '@/types/presentation';
 
 export default function PresentationPage() {
@@ -17,14 +19,31 @@ export default function PresentationPage() {
   const { user } = useAuth();
   const presentationId = params.id as string;
 
-  const [presentation, setPresentation] = useState<Presentation | null>(null);
+  // Use store for presentation state
+  const {
+    currentPresentation: presentation,
+    loading,
+    error,
+    saving,
+    hasUnsavedChanges,
+    lastSaved,
+    saveError,
+    setCurrentPresentation,
+    updateSlide,
+    setUserId,
+    savePresentation,
+  } = usePresentationStore();
+
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Set user ID in store
+  useEffect(() => {
+    if (user?.id) {
+      setUserId(user.id);
+    }
+  }, [user, setUserId]);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -42,12 +61,12 @@ export default function PresentationPage() {
 
         const data = await response.json();
         const pres = data.presentation;
-        setPresentation(pres);
+        setCurrentPresentation(pres);
 
         // If presentation is still generating, use SSE for real-time updates
         if (pres.status === 'generating') {
           console.log('[SSE] Presentation is generating, connecting to SSE stream...');
-          setLoading(false); // Show generating UI instead of loading spinner
+          usePresentationStore.getState().setLoading(false); // Show generating UI instead of loading spinner
           
           try {
             // Connect to SSE endpoint
@@ -61,14 +80,14 @@ export default function PresentationPage() {
               try {
                 const updatedPres = JSON.parse(event.data);
                 console.log('[SSE] Received update:', updatedPres.status);
-                setPresentation(updatedPres);
+                setCurrentPresentation(updatedPres);
                 
                 // If generation is complete or failed, close the connection
                 if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
                   console.log(`[SSE] Presentation ${updatedPres.status}, closing connection`);
                   
                   if (updatedPres.status === 'failed') {
-                    setError(updatedPres.error_message || 'Presentation generation failed');
+                    usePresentationStore.getState().setError(updatedPres.error_message || 'Presentation generation failed');
                   }
                   
                   if (eventSource) {
@@ -115,7 +134,7 @@ export default function PresentationPage() {
                     if (pollResponse.ok) {
                       const pollData = await pollResponse.json();
                       const updatedPres = pollData.presentation;
-                      setPresentation(updatedPres);
+                      setCurrentPresentation(updatedPres);
                       
                       if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
                         if (fallbackInterval) {
@@ -124,7 +143,7 @@ export default function PresentationPage() {
                         }
                         
                         if (updatedPres.status === 'failed') {
-                          setError(updatedPres.error_message || 'Presentation generation failed');
+                          usePresentationStore.getState().setError(updatedPres.error_message || 'Presentation generation failed');
                         }
                       }
                     }
@@ -137,19 +156,19 @@ export default function PresentationPage() {
           } catch (sseError) {
             console.error('[SSE] Failed to create EventSource:', sseError);
             // Fall back to initial polling setup
-            setLoading(false);
+            usePresentationStore.getState().setLoading(false);
           }
         } else if (pres.status === 'failed') {
-          setError(pres.error_message || 'Presentation generation failed');
-          setLoading(false);
+          usePresentationStore.getState().setError(pres.error_message || 'Presentation generation failed');
+          usePresentationStore.getState().setLoading(false);
         } else {
           // Presentation is completed
-          setLoading(false);
+          usePresentationStore.getState().setLoading(false);
         }
       } catch (err) {
         console.error('Error loading presentation:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load presentation');
-        setLoading(false);
+        usePresentationStore.getState().setError(err instanceof Error ? err.message : 'Failed to load presentation');
+        usePresentationStore.getState().setLoading(false);
       }
     };
 
@@ -189,62 +208,23 @@ export default function PresentationPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [presentation, router]);
 
-  // Auto-save functionality
-  const savePresentation = async () => {
-    if (!presentation || !user) return;
-
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations/${presentationId}?user_id=${user.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slides: presentation.slides,
-          updated_at: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save presentation');
-      }
-
-      setHasUnsavedChanges(false);
-      console.log('Presentation saved successfully');
-    } catch (err) {
-      console.error('Error saving presentation:', err);
-    }
-  };
-
-  // Update slide with debounced auto-save
-  const updateSlide = (index: number, updates: Partial<Slide>) => {
-    if (!presentation) return;
-
-    const newSlides = [...presentation.slides];
-    newSlides[index] = { ...newSlides[index], ...updates };
-    setPresentation({ ...presentation, slides: newSlides });
-    setHasUnsavedChanges(true);
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Set new timeout for auto-save (2.5 seconds)
-    saveTimeoutRef.current = setTimeout(() => {
-      savePresentation();
-    }, 2500);
-  };
-
-  // Cleanup timeout on unmount
+  // Navigation guard - warn user before leaving with unsaved changes
   useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        // Show browser warning - debounced save should have already triggered
+        // but if user closes immediately, changes may be lost
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
       }
     };
-  }, []);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   const handleExport = async () => {
     if (!presentation || exporting) return;
@@ -503,6 +483,18 @@ export default function PresentationPage() {
             <h1 className="text-sm font-medium text-foreground">{presentation.title}</h1>
           </div>
           <div className="flex items-center gap-3">
+            {/* Save Status Indicator */}
+            {saveError ? (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1">
+                <AlertCircle className="h-3 w-3 text-destructive" />
+                <span className="font-mono text-xs text-destructive">Save failed</span>
+              </div>
+            ) : (
+              <AutoSaveIndicator 
+                hasUnsavedChanges={hasUnsavedChanges || saving} 
+                lastSaved={lastSaved} 
+              />
+            )}
             <span className="rounded-md border border-border bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground">
               {currentSlide + 1} / {presentation.slides.length}
             </span>
@@ -524,7 +516,9 @@ export default function PresentationPage() {
             citationStyle={presentation.citation_style}
             theme={presentation.theme}
             presentationId={presentationId}
-            onUpdate={(updates) => updateSlide(currentSlide, updates)}
+            onUpdate={(updates) => {
+              updateSlide(currentSlide, updates);
+            }}
           />
         </div>
       </div>

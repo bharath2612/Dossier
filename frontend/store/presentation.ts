@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Presentation, Slide, Theme, CitationStyle } from './types';
+import type { Presentation, Slide, Theme, CitationStyle, ContentBlock } from './types';
 
 interface PresentationStore {
   // State
@@ -9,14 +9,20 @@ interface PresentationStore {
   loading: boolean;
   error: string | null;
   saving: boolean;
+  hasUnsavedChanges: boolean;
+  lastSaved: Date | null;
+  saveError: string | null;
+  userId: string | null;
 
   // Actions
   setCurrentPresentation: (presentation: Presentation | null) => void;
   setPresentations: (presentations: Presentation[]) => void;
   updateSlide: (slideIndex: number, updates: Partial<Slide>) => Promise<void>;
+  updatePresentation: (updates: Partial<Presentation>) => void;
   updateTitle: (title: string) => Promise<void>;
   setTheme: (theme: Theme) => Promise<void>;
   setCitationStyle: (style: CitationStyle) => Promise<void>;
+  savePresentation: () => Promise<void>;
   fetchPresentations: () => Promise<void>;
   fetchPresentation: (id: string) => Promise<void>;
   duplicatePresentation: (id: string) => Promise<void>;
@@ -24,7 +30,11 @@ interface PresentationStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setSaving: (saving: boolean) => void;
+  setUserId: (userId: string | null) => void;
 }
+
+// Debounce timeout for auto-save
+let saveTimeout: NodeJS.Timeout | null = null;
 
 export const usePresentationStore = create<PresentationStore>()(
   devtools(
@@ -35,10 +45,21 @@ export const usePresentationStore = create<PresentationStore>()(
       loading: false,
       error: null,
       saving: false,
+      hasUnsavedChanges: false,
+      lastSaved: null,
+      saveError: null,
+      userId: null,
 
       // Actions
       setCurrentPresentation: (presentation) =>
-        set({ currentPresentation: presentation }),
+        set({ 
+          currentPresentation: presentation,
+          hasUnsavedChanges: false,
+          lastSaved: presentation ? new Date() : null,
+          saveError: null,
+        }),
+      
+      setUserId: (userId) => set({ userId }),
 
       setPresentations: (presentations) => set({ presentations }),
 
@@ -51,105 +72,96 @@ export const usePresentationStore = create<PresentationStore>()(
           idx === slideIndex ? { ...slide, ...updates } : slide
         );
 
+        get().updatePresentation({ slides: updatedSlides });
+      },
+
+      // Main update method that triggers auto-save
+      updatePresentation: (updates) => {
+        const { currentPresentation } = get();
+        if (!currentPresentation) return;
+
+        // Optimistic update
         set({
           currentPresentation: {
             ...currentPresentation,
-            slides: updatedSlides,
+            ...updates,
           },
-          saving: true,
+          hasUnsavedChanges: true,
+          saveError: null,
         });
 
-        try {
-          // TODO: API call to update presentation
-          // await fetch(`/api/presentations/${currentPresentation.id}`, {
-          //   method: 'PATCH',
-          //   body: JSON.stringify({ slides: updatedSlides }),
-          // });
-
-          set({ saving: false });
-        } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : 'Failed to update slide',
-            saving: false,
-          });
-        }
+        // Debounce save
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          get().savePresentation();
+        }, 2500);
       },
 
       updateTitle: async (title) => {
-        const { currentPresentation } = get();
-        if (!currentPresentation) return;
-
-        // Optimistic update
-        set({
-          currentPresentation: { ...currentPresentation, title },
-          saving: true,
-        });
-
-        try {
-          // TODO: API call to update presentation
-          // await fetch(`/api/presentations/${currentPresentation.id}`, {
-          //   method: 'PATCH',
-          //   body: JSON.stringify({ title }),
-          // });
-
-          set({ saving: false });
-        } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : 'Failed to update title',
-            saving: false,
-          });
-        }
+        get().updatePresentation({ title });
       },
 
       setTheme: async (theme) => {
-        const { currentPresentation } = get();
-        if (!currentPresentation) return;
-
-        // Optimistic update
-        set({
-          currentPresentation: { ...currentPresentation, theme },
-          saving: true,
-        });
-
-        try {
-          // TODO: API call to update presentation
-          // await fetch(`/api/presentations/${currentPresentation.id}`, {
-          //   method: 'PATCH',
-          //   body: JSON.stringify({ theme }),
-          // });
-
-          set({ saving: false });
-        } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : 'Failed to update theme',
-            saving: false,
-          });
-        }
+        get().updatePresentation({ theme });
       },
 
       setCitationStyle: async (citation_style) => {
-        const { currentPresentation } = get();
-        if (!currentPresentation) return;
+        get().updatePresentation({ citation_style });
+      },
 
-        // Optimistic update
-        set({
-          currentPresentation: { ...currentPresentation, citation_style },
-          saving: true,
-        });
+      // Save presentation to database
+      savePresentation: async () => {
+        const { currentPresentation, userId } = get();
+        if (!currentPresentation || !userId) return;
+
+        set({ saving: true, saveError: null });
 
         try {
-          // TODO: API call to update presentation
-          // await fetch(`/api/presentations/${currentPresentation.id}`, {
-          //   method: 'PATCH',
-          //   body: JSON.stringify({ citation_style }),
-          // });
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          
+          // Prepare update payload - save the entire presentation state
+          // This handles both slides (legacy) and content_blocks (new widget-based editor)
+          const updates: any = {
+            slides: currentPresentation.slides,
+            updated_at: new Date().toISOString(),
+          };
 
-          set({ saving: false });
-        } catch (error) {
+          // Also save title, theme, citation_style if they exist
+          if (currentPresentation.title) updates.title = currentPresentation.title;
+          if (currentPresentation.theme) updates.theme = currentPresentation.theme;
+          if (currentPresentation.citation_style) updates.citation_style = currentPresentation.citation_style;
+
+          const response = await fetch(
+            `${API_URL}/api/presentations/${currentPresentation.id}?user_id=${userId}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(updates),
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to save presentation');
+          }
+
+          const data = await response.json();
+          const savedPresentation = data.presentation;
+
           set({
-            error:
-              error instanceof Error ? error.message : 'Failed to update citation style',
+            currentPresentation: savedPresentation,
             saving: false,
+            hasUnsavedChanges: false,
+            lastSaved: new Date(),
+            saveError: null,
+          });
+        } catch (error) {
+          console.error('Error saving presentation:', error);
+          set({
+            saving: false,
+            saveError: error instanceof Error ? error.message : 'Failed to save presentation',
           });
         }
       },

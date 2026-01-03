@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bold,
   Italic,
@@ -20,6 +20,7 @@ import type {
   FontSize,
   TextStyle,
   TextAlignment,
+  TextLevel,
   SlideImage,
 } from '@/types/presentation';
 
@@ -34,6 +35,7 @@ interface FloatingToolbarProps {
   onImageChange?: (image: SlideImage | undefined) => void;
 }
 
+// DEPRECATED - kept for reference only
 const FONT_SIZES: Array<{ value: FontSize; label: string }> = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
@@ -41,11 +43,20 @@ const FONT_SIZES: Array<{ value: FontSize; label: string }> = [
   { value: 'extra-large', label: 'Extra Large' },
 ];
 
+// DEPRECATED - kept for reference only
 const TEXT_STYLES: Array<{ value: TextStyle; label: string }> = [
   { value: 'heading', label: 'Heading' },
   { value: 'subtitle', label: 'Subtitle' },
   { value: 'body', label: 'Body' },
   { value: 'quote', label: 'Quote' },
+];
+
+// NEW: Unified text level system (Notion-style)
+const TEXT_LEVELS: Array<{ value: TextLevel; label: string; size: string }> = [
+  { value: 'text', label: 'Text', size: '16px' },
+  { value: 'h3', label: 'Heading 3', size: '28px' },
+  { value: 'h2', label: 'Heading 2', size: '36px' },
+  { value: 'h1', label: 'Heading 1', size: '48px' },
 ];
 
 const COLOR_PRESETS = [
@@ -65,6 +76,8 @@ export function FloatingToolbar({
   onImageChange,
 }: FloatingToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = useState(568); // Estimated default width
+  const [toolbarHeight, setToolbarHeight] = useState(42); // Estimated default height
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [customColor, setCustomColor] = useState(currentFormat.color || '#000000');
@@ -73,27 +86,84 @@ export function FloatingToolbar({
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkUrl, setLinkUrl] = useState(currentFormat.link || '');
 
-  // Adjust position to keep toolbar on screen
+  // Measure toolbar dimensions after first render
   useEffect(() => {
     if (!visible || !toolbarRef.current) return;
 
     const toolbar = toolbarRef.current;
     const rect = toolbar.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    setToolbarWidth(rect.width);
+    setToolbarHeight(rect.height);
+  }, [visible]);
 
-    // Adjust horizontal position
-    if (rect.right > viewportWidth) {
-      toolbar.style.left = `${viewportWidth - rect.width - 10}px`;
-    } else if (rect.left < 0) {
-      toolbar.style.left = '10px';
+  // Calculate adjusted position before render to prevent off-screen flash
+  const adjustedPosition = useMemo(() => {
+    if (!visible) return { left: 0, top: 0, transform: 'translateX(-50%)' };
+
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const padding = 10;
+    const verticalOffset = 45; // Distance above selection
+
+    // Handle case where toolbar is wider than viewport
+    if (toolbarWidth > viewportWidth - (padding * 2)) {
+      // Toolbar is too wide - just align to left edge
+      const left = padding;
+      const transform = 'translateX(0)';
+      
+      // Vertical positioning
+      let top = position.y - verticalOffset;
+      if (top + toolbarHeight > viewportHeight - padding) {
+        top = position.y + padding;
+      }
+      if (top + toolbarHeight > viewportHeight - padding) {
+        top = viewportHeight - padding - toolbarHeight;
+      }
+      if (top < padding) {
+        top = padding;
+      }
+      
+      return { left, top, transform };
     }
 
-    // Adjust vertical position
-    if (rect.bottom > viewportHeight) {
-      toolbar.style.top = `${position.y - rect.height - 10}px`;
+    // Calculate expected bounds with transform translateX(-50%)
+    const expectedLeftEdge = position.x - (toolbarWidth / 2);
+    const expectedRightEdge = position.x + (toolbarWidth / 2);
+
+    // Horizontal constraint logic
+    let left = position.x;
+    let transform = 'translateX(-50%)';
+
+    if (expectedLeftEdge < padding) {
+      // Toolbar would go off left edge - align left edge to padding
+      left = padding + (toolbarWidth / 2);
+      transform = 'translateX(-50%)';
+    } else if (expectedRightEdge > viewportWidth - padding) {
+      // Toolbar would go off right edge - align right edge to viewportWidth - padding
+      left = viewportWidth - padding - (toolbarWidth / 2);
+      transform = 'translateX(-50%)';
     }
-  }, [visible, position]);
+
+    // Vertical constraint logic
+    let top = position.y - verticalOffset;
+
+    // Check if toolbar would go below viewport if shown above
+    if (top + toolbarHeight > viewportHeight - padding) {
+      // Not enough room above, flip to show below
+      top = position.y + padding;
+      // Ensure it doesn't go below viewport
+      if (top + toolbarHeight > viewportHeight - padding) {
+        top = viewportHeight - padding - toolbarHeight;
+      }
+    }
+
+    // Ensure toolbar doesn't go above viewport
+    if (top < padding) {
+      top = padding;
+    }
+
+    return { left, top, transform };
+  }, [visible, position.x, position.y, toolbarWidth, toolbarHeight]);
 
   // Handle format toggle
   const toggleFormat = (key: 'bold' | 'italic' | 'underline' | 'strikethrough') => {
@@ -118,17 +188,24 @@ export function FloatingToolbar({
     setShowLinkDialog(false);
   };
 
-  // Handle font size change
+  // Handle font size change (DEPRECATED - for backward compatibility)
   const handleFontSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onFormatChange({
       fontSize: e.target.value as FontSize,
     });
   };
 
-  // Handle text style change
+  // Handle text style change (DEPRECATED - for backward compatibility)
   const handleTextStyleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onFormatChange({
       textStyle: e.target.value as TextStyle,
+    });
+  };
+
+  // NEW: Handle text level change (Notion-style unified sizing)
+  const handleTextLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onFormatChange({
+      textLevel: e.target.value as TextLevel,
     });
   };
 
@@ -165,38 +242,24 @@ export function FloatingToolbar({
         ref={toolbarRef}
         className="fixed z-50 flex items-center gap-1 rounded-lg border border-border bg-card p-1 shadow-lg animate-in fade-in-0 zoom-in-95 duration-200"
         style={{
-          left: `${position.x}px`,
-          top: `${position.y - 45}px`, // 10px above selection + toolbar height
-          transform: 'translateX(-50%)',
+          left: `${adjustedPosition.left}px`,
+          top: `${adjustedPosition.top}px`,
+          transform: adjustedPosition.transform,
         }}
         onClick={(e) => e.stopPropagation()}
         role="toolbar"
         aria-label="Text formatting toolbar"
       >
-        {/* Font Size */}
+        {/* Text Level (Notion-style unified sizing) */}
         <select
-          value={currentFormat.fontSize || 'medium'}
-          onChange={handleFontSizeChange}
+          value={currentFormat.textLevel || 'text'}
+          onChange={handleTextLevelChange}
           className="h-8 rounded border border-border bg-background px-2 text-xs outline-none hover:bg-secondary focus:ring-2 focus:ring-brand"
           onClick={(e) => e.stopPropagation()}
         >
-          {FONT_SIZES.map((size) => (
-            <option key={size.value} value={size.value}>
-              {size.label}
-            </option>
-          ))}
-        </select>
-
-        {/* Text Style */}
-        <select
-          value={currentFormat.textStyle || 'body'}
-          onChange={handleTextStyleChange}
-          className="h-8 rounded border border-border bg-background px-2 text-xs outline-none hover:bg-secondary focus:ring-2 focus:ring-brand"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {TEXT_STYLES.map((style) => (
-            <option key={style.value} value={style.value}>
-              {style.label}
+          {TEXT_LEVELS.map((level) => (
+            <option key={level.value} value={level.value}>
+              {level.label} ({level.size})
             </option>
           ))}
         </select>

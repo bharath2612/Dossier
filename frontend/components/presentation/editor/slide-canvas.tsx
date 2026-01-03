@@ -79,8 +79,17 @@ export function SlideCanvas({
     const newWidget = createDefaultWidget(type, contentBlocks);
 
     // Apply options if provided
-    if (options && 'level' in newWidget.data) {
-      newWidget.data.level = options.level;
+    if (options) {
+      if ('level' in newWidget.data) {
+        newWidget.data.level = options.level;
+        // Also set textLevel on segments to match heading level
+        if ('segments' in newWidget.data && Array.isArray(newWidget.data.segments)) {
+          newWidget.data.segments = newWidget.data.segments.map(seg => ({
+            ...seg,
+            textLevel: options.level,
+          }));
+        }
+      }
     }
 
     handleAddBlock(newWidget);
@@ -145,6 +154,48 @@ export function SlideCanvas({
       console.error('[SlideCanvas] No active editor ref to apply format to!');
     }
   }, []);
+
+  // Handle clicks to clear text selection and hide toolbar
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Don't clear if clicking on toolbar or its children
+      if (target.closest('[role="toolbar"]')) {
+        return;
+      }
+      
+      // Don't clear if clicking on text editor (contentEditable)
+      if (target.closest('[contenteditable="true"]')) {
+        return;
+      }
+      
+      // Don't clear if clicking on buttons, inputs, or other interactive elements (except the canvas)
+      if (target.closest('button, input, select, textarea')) {
+        return;
+      }
+      
+      // Clear browser text selection
+      if (window.getSelection) {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          selection.removeAllRanges();
+        }
+      }
+      
+      // Hide toolbar if it's visible
+      if (toolbarVisible) {
+        handleSelectionChange(false, {});
+      }
+    };
+
+    // Use capture phase to catch clicks even if stopPropagation is called
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [toolbarVisible, handleSelectionChange]);
 
   return (
     <div ref={containerRef} className="group relative">
