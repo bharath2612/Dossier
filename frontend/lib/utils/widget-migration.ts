@@ -111,9 +111,7 @@ export function slideNeedsMigration(slide: Slide): boolean {
   }
 
   // If has legacy content (title or body), needs migration
-  const hasTitle = slide.title && (
-    typeof slide.title === 'string' ? slide.title.trim() : slide.title.length > 0
-  );
+  const hasTitle = slide.title && slide.title.trim();
   const hasBody = Array.isArray(slide.body) && slide.body.length > 0;
   const hasImage = slide.image && slide.image.url;
 
