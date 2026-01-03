@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Download, ChevronLeft, ChevronRight, Edit3, Home, LayoutDashboard } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { SlideCanvas } from '@/components/presentation/editor/slide-canvas';
 import { SlideViewer } from '@/components/presentation/slide-viewer';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { getTheme } from '@/lib/themes';
-import type { Presentation } from '@/types/presentation';
+import type { Presentation, Slide } from '@/types/presentation';
 
 export default function PresentationPage() {
   const params = useParams();
@@ -22,6 +23,8 @@ export default function PresentationPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -185,6 +188,63 @@ export default function PresentationPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [presentation, router]);
+
+  // Auto-save functionality
+  const savePresentation = async () => {
+    if (!presentation || !user) return;
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const response = await fetch(`${API_URL}/api/presentations/${presentationId}?user_id=${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slides: presentation.slides,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save presentation');
+      }
+
+      setHasUnsavedChanges(false);
+      console.log('Presentation saved successfully');
+    } catch (err) {
+      console.error('Error saving presentation:', err);
+    }
+  };
+
+  // Update slide with debounced auto-save
+  const updateSlide = (index: number, updates: Partial<Slide>) => {
+    if (!presentation) return;
+
+    const newSlides = [...presentation.slides];
+    newSlides[index] = { ...newSlides[index], ...updates };
+    setPresentation({ ...presentation, slides: newSlides });
+    setHasUnsavedChanges(true);
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for auto-save (2.5 seconds)
+    saveTimeoutRef.current = setTimeout(() => {
+      savePresentation();
+    }, 2500);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleExport = async () => {
     if (!presentation || exporting) return;
@@ -451,15 +511,20 @@ export default function PresentationPage() {
         </div>
       </header>
 
-      {/* Slide Viewer */}
+      {/* Slide Editor */}
       <div className="flex min-h-screen items-center justify-center px-6 pt-20 pb-32">
-        <div ref={(el) => {
-          if (el) slideRefs.current[currentSlide] = el;
-        }}>
-          <SlideViewer
+        <div
+          ref={(el) => {
+            if (el) slideRefs.current[currentSlide] = el;
+          }}
+          className="w-full max-w-7xl"
+        >
+          <SlideCanvas
             slide={slide}
             citationStyle={presentation.citation_style}
             theme={presentation.theme}
+            presentationId={presentationId}
+            onUpdate={(updates) => updateSlide(currentSlide, updates)}
           />
         </div>
       </div>
@@ -526,15 +591,6 @@ export default function PresentationPage() {
               <Download className="h-4 w-4" />
               {exporting ? 'Exporting...' : 'Export PDF'}
             </Button>
-            {user && (
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/presentation/${presentationId}/edit`)}
-              >
-                <Edit3 className="h-4 w-4" />
-                Edit
-              </Button>
-            )}
             {user && (
               <Button
                 variant="ghost"

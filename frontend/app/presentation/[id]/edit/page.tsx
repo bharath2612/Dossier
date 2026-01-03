@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { EditableSlideViewer } from '@/components/presentation/editable-slide-viewer';
+import { SlideCanvas } from '@/components/presentation/editor/slide-canvas';
 import { AutoSaveIndicator } from '@/components/outline/auto-save-indicator';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ChevronLeft, ChevronRight, Plus, Trash2, LayoutGrid, Presentation as PresentationIcon } from 'lucide-react';
@@ -273,10 +273,10 @@ export default function PresentationEditPage() {
       {/* Main content */}
       {viewMode === 'single' ? (
         <div className="mx-auto max-w-7xl px-6 pb-32 pt-20">
-          {/* Slide viewer */}
+          {/* Slide editor */}
           <div className="mb-6 overflow-hidden rounded-xl border border-border shadow-lg">
             {currentSlide && (
-              <EditableSlideViewer
+              <SlideCanvas
                 slide={currentSlide}
                 citationStyle={presentation.citation_style}
                 theme={presentation.theme}
@@ -375,9 +375,9 @@ export default function PresentationEditPage() {
                 }`}
               >
                 {/* Slide thumbnail */}
-                <div className="aspect-video overflow-hidden">
+                <div className="aspect-video overflow-hidden pointer-events-none">
                   <div className="scale-[0.25] origin-top-left w-[400%] h-[400%]">
-                    <EditableSlideViewer
+                    <SlideCanvas
                       slide={slide}
                       citationStyle={presentation.citation_style}
                       theme={presentation.theme}
