@@ -14,8 +14,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Check if backend URL is provided
-BACKEND_URL="${1:-https://dossier-backend.vercel.app}"
-FRONTEND_URL="${2:-https://beautiful-pptx.vercel.app}"
+# Usage: ./test-cors.sh [BACKEND_URL] [FRONTEND_URL]
+# Example: ./test-cors.sh http://localhost:8080 http://localhost:3000
+BACKEND_URL="${1:-http://localhost:8080}"
+FRONTEND_URL="${2:-http://localhost:3000}"
 
 echo "📡 Backend URL: $BACKEND_URL"
 echo "🌐 Frontend URL: $FRONTEND_URL"

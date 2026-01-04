@@ -6,8 +6,9 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // CORS
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '*' : '*');
 app.use(cors({
-  origin: 'https://beautiful-pptx.vercel.app',
+  origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

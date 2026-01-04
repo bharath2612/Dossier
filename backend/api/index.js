@@ -3,8 +3,9 @@ const express = require('express');
 const app = express();
 
 // Manual CORS middleware
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '*' : '*');
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://beautiful-pptx.vercel.app');
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
