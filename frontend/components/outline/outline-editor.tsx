@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
 import { useDraftStore } from '@/store/draft';
 import { useAuth } from '@/hooks/useAuth';
+import { apiClient } from '@/lib/api/client';
 import {
   DndContext,
   closestCenter,
@@ -101,44 +102,21 @@ export function OutlineEditor({ onBack }: OutlineEditorProps) {
       setIsGenerating(true);
       setGenerationError(null);
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
       // Ensure user exists in public.users before generating
-      const userResponse = await fetch(`${API_URL}/api/users/ensure`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          email: user.email,
-        }),
+      await apiClient.ensureUser({
+        user_id: user.id,
+        email: user.email,
       });
-
-      if (!userResponse.ok) {
-        const errorData = await userResponse.json();
-        throw new Error(errorData.error || 'Failed to create user record');
-      }
 
       // Generate presentation
-      const response = await fetch(`${API_URL}/api/generate-presentation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          draft_id: currentDraft.id,
-          outline,
-          citation_style: citationStyle,
-          theme: theme,
-          user_id: user.id,
-        }),
+      const data = await apiClient.generatePresentation({
+        draft_id: currentDraft.id,
+        outline,
+        citation_style: citationStyle,
+        theme: theme,
+        user_id: user.id,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate presentation');
-      }
-
-      const data = await response.json();
       console.log('Presentation generation started:', data);
 
       // Navigate to presentation viewer immediately (use replace to avoid back-button issues)

@@ -1,6 +1,5 @@
 // API client for backend communication
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// Always uses local Next.js API routes
 
 export interface ApiError {
   error: string;
@@ -59,18 +58,12 @@ export interface GenerateOutlineResponse {
 }
 
 class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    // Remove trailing slash to prevent double slashes
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-  }
-
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // Always use local Next.js API routes
+    const url = endpoint;
 
     try {
       const response = await fetch(url, {
@@ -124,6 +117,177 @@ class ApiClient {
     if (onProgress) onProgress(100); // Complete
 
     return result;
+  }
+
+  // Generate presentation (background generation)
+  async generatePresentation(data: {
+    draft_id: string;
+    outline: any;
+    citation_style: string;
+    theme: string;
+    user_id: string;
+  }): Promise<{ presentation_id: string; status: string }> {
+    return this.request<{ presentation_id: string; status: string }>(
+      '/api/generate-presentation',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  // Ensure user exists in database
+  async ensureUser(data: {
+    user_id: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+  }): Promise<{ success: boolean; user_id: string; created: boolean }> {
+    return this.request<{ success: boolean; user_id: string; created: boolean }>(
+      '/api/users/ensure',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  // Get presentation by ID
+  async getPresentation(id: string, userId?: string): Promise<{ presentation: any }> {
+    const url = userId 
+      ? `/api/presentations/${id}?user_id=${userId}`
+      : `/api/presentations/${id}`;
+    return this.request<{ presentation: any }>(url);
+  }
+
+  // Get all presentations for a user
+  async getPresentations(userId: string, searchQuery?: string): Promise<{ presentations: any[] }> {
+    const url = searchQuery
+      ? `/api/presentations?user_id=${userId}&q=${encodeURIComponent(searchQuery)}`
+      : `/api/presentations?user_id=${userId}`;
+    return this.request<{ presentations: any[] }>(url);
+  }
+
+  // Update presentation
+  async updatePresentation(
+    id: string,
+    updates: any,
+    userId?: string
+  ): Promise<{ presentation: any; message: string }> {
+    const url = userId
+      ? `/api/presentations/${id}?user_id=${userId}`
+      : `/api/presentations/${id}`;
+    return this.request<{ presentation: any; message: string }>(url, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Delete presentation
+  async deletePresentation(id: string, userId?: string): Promise<{ message: string }> {
+    const url = userId
+      ? `/api/presentations/${id}?user_id=${userId}`
+      : `/api/presentations/${id}`;
+    return this.request<{ message: string }>(url, {
+      method: 'DELETE',
+    });
+  }
+
+  // Duplicate presentation
+  async duplicatePresentation(id: string, userId: string): Promise<{ presentation_id: string; message: string }> {
+    return this.request<{ presentation_id: string; message: string }>(
+      `/api/presentations/${id}/duplicate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId }),
+      }
+    );
+  }
+
+  // Get draft by ID
+  async getDraft(id: string): Promise<{ draft: any }> {
+    return this.request<{ draft: any }>(`/api/drafts/${id}`);
+  }
+
+  // Create draft
+  async createDraft(data: {
+    title: string;
+    prompt: string;
+    enhanced_prompt?: string;
+    outline: any;
+  }): Promise<{ draft: any; message: string }> {
+    return this.request<{ draft: any; message: string }>('/api/drafts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Update draft
+  async updateDraft(id: string, updates: { outline?: any; title?: string }): Promise<{ draft: any; message: string }> {
+    return this.request<{ draft: any; message: string }>(`/api/drafts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Delete draft
+  async deleteDraft(id: string): Promise<{ message: string; id: string }> {
+    return this.request<{ message: string; id: string }>(`/api/drafts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Get SSE stream URL for presentation status
+  getPresentationStreamUrl(id: string, userId?: string): string {
+    return userId
+      ? `/api/presentations/${id}/stream?user_id=${userId}`
+      : `/api/presentations/${id}/stream`;
+  }
+
+  // Generate presentation with streaming (optional enhancement)
+  async generatePresentationStream(
+    data: {
+      presentation_id: string;
+      draft_id: string;
+      outline: any;
+      citation_style: string;
+      theme: string;
+      user_id: string;
+    },
+    onProgress?: (chunk: string) => void
+  ): Promise<void> {
+    const url = '/api/generate-presentation/stream';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || error.error || 'Streaming failed');
+    }
+
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      if (onProgress) {
+        onProgress(chunk);
+      }
+    }
   }
 
   // Health check

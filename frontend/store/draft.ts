@@ -163,51 +163,29 @@ export const useDraftStore = create<DraftStore>()(
         if (!outline) return;
 
         try {
-          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const { apiClient } = await import('@/lib/api/client');
 
           if (currentDraft?.id) {
             // Update existing draft
-            const response = await fetch(`${API_URL}/api/drafts/${currentDraft.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ outline }),
-            });
-
-            if (!response.ok) {
-              const error = await response.json();
-              throw new Error(error.message || 'Failed to save draft');
-            }
-
-            const data = await response.json();
+            const updateResult = await apiClient.updateDraft(currentDraft.id, { outline });
 
             set({
-              currentDraft: data.draft,
+              currentDraft: updateResult.draft,
               hasUnsavedChanges: false,
               lastSaved: new Date(),
               error: null,
             });
           } else {
             // Create new draft (shouldn't happen in normal flow, but handle it)
-            const response = await fetch(`${API_URL}/api/drafts`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: outline.title,
-                prompt: currentDraft?.prompt || '',
-                enhanced_prompt: currentDraft?.enhanced_prompt,
-                outline,
-              }),
+            const createResult = await apiClient.createDraft({
+              title: outline.title,
+              prompt: currentDraft?.prompt || '',
+              enhanced_prompt: currentDraft?.enhanced_prompt,
+              outline,
             });
 
-            if (!response.ok) {
-              const error = await response.json();
-              throw new Error(error.message || 'Failed to create draft');
-            }
-
-            const data = await response.json();
-
             set({
-              currentDraft: data.draft,
+              currentDraft: createResult.draft,
               hasUnsavedChanges: false,
               lastSaved: new Date(),
               error: null,

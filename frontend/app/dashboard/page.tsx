@@ -41,14 +41,8 @@ function DashboardContent() {
       if (showLoading) {
         setLoading(true);
       }
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations?user_id=${user.id}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch presentations');
-      }
-
-      const data = await response.json();
+      const { apiClient } = await import('@/lib/api/client');
+      const data = await apiClient.getPresentations(user.id);
       setPresentations(data.presentations || []);
     } catch (err) {
       console.error('Error fetching presentations:', err);
@@ -84,7 +78,6 @@ function DashboardContent() {
       return;
     }
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     const generatingPresentations = presentations.filter(p => p.status === 'generating');
     const connections = sseConnectionsRef.current;
     
@@ -99,17 +92,20 @@ function DashboardContent() {
     });
 
     // Create SSE connections for new generating presentations
-    generatingPresentations.forEach((presentation) => {
-      // Skip if connection already exists
-      if (connections.has(presentation.id)) {
-        return;
-      }
+    // Use for...of to handle async operations properly
+    (async () => {
+      const { apiClient } = await import('@/lib/api/client');
+      
+      for (const presentation of generatingPresentations) {
+        // Skip if connection already exists
+        if (connections.has(presentation.id)) {
+          continue;
+        }
 
-      try {
-        console.log(`[Dashboard SSE] Creating connection for presentation ${presentation.id}`);
-        const eventSource = new EventSource(
-          `${API_URL}/api/presentations/${presentation.id}/stream?user_id=${user.id}`
-        );
+        try {
+          console.log(`[Dashboard SSE] Creating connection for presentation ${presentation.id}`);
+          const streamUrl = apiClient.getPresentationStreamUrl(presentation.id, user.id);
+          const eventSource = new EventSource(streamUrl);
 
         eventSource.onopen = () => {
           console.log(`[Dashboard SSE] Connected for presentation ${presentation.id}`);
@@ -145,11 +141,12 @@ function DashboardContent() {
           }
         };
 
-        connections.set(presentation.id, eventSource);
-      } catch (sseError) {
-        console.error(`[Dashboard SSE] Failed to create EventSource for ${presentation.id}:`, sseError);
+          connections.set(presentation.id, eventSource);
+        } catch (sseError) {
+          console.error(`[Dashboard SSE] Failed to create EventSource for ${presentation.id}:`, sseError);
+        }
       }
-    });
+    })();
 
     // Cleanup: close all SSE connections on unmount
     return () => {
@@ -181,15 +178,8 @@ function DashboardContent() {
     }
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations/${id}?user_id=${user?.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete presentation');
-      }
-
+      const { apiClient } = await import('@/lib/api/client');
+      await apiClient.deletePresentation(id, user?.id);
       setPresentations((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error('Error deleting presentation:', err);
@@ -199,19 +189,11 @@ function DashboardContent() {
 
   const handleDuplicate = async (id: string) => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations/${id}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user?.id }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to duplicate presentation');
-      }
-
-      const data = await response.json();
-      setPresentations((prev) => [data.presentation, ...prev]);
+      const { apiClient } = await import('@/lib/api/client');
+      const data = await apiClient.duplicatePresentation(id, user?.id || '');
+      // Fetch updated presentation to get full data
+      const updatedPres = await apiClient.getPresentation(data.presentation_id, user?.id);
+      setPresentations((prev) => [updatedPres.presentation, ...prev]);
     } catch (err) {
       console.error('Error duplicating presentation:', err);
       alert(err instanceof Error ? err.message : 'Failed to duplicate presentation');

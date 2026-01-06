@@ -40,14 +40,8 @@ export default function PresentationEditPage() {
   const fetchPresentation = async () => {
     try {
       setLoading(true);
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations/${presentationId}?user_id=${user?.id}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to load presentation');
-      }
-
-      const data = await response.json();
+      const { apiClient } = await import('@/lib/api/client');
+      const data = await apiClient.getPresentation(presentationId, user?.id);
       setPresentation(data.presentation);
       setSlides(data.presentation.slides);
     } catch (err) {
@@ -62,19 +56,15 @@ export default function PresentationEditPage() {
     if (!presentation || !user) return;
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/presentations/${presentationId}?user_id=${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { apiClient } = await import('@/lib/api/client');
+      await apiClient.updatePresentation(
+        presentationId,
+        {
           slides,
           updated_at: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save changes');
-      }
+        },
+        user.id
+      );
 
       setHasUnsavedChanges(false);
       setLastSaved(new Date());

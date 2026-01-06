@@ -49,18 +49,12 @@ export default function PresentationPage() {
     let eventSource: EventSource | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
     const fetchPresentation = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/presentations/${presentationId}`);
-
-        if (!response.ok) {
-          throw new Error('Failed to load presentation');
-        }
-
-        const data = await response.json();
+        const { apiClient } = await import('@/lib/api/client');
+        const data = await apiClient.getPresentation(presentationId, user?.id);
         const pres = data.presentation;
+
         setCurrentPresentation(pres);
 
         // If presentation is still generating, use SSE for real-time updates
@@ -70,7 +64,8 @@ export default function PresentationPage() {
           
           try {
             // Connect to SSE endpoint
-            eventSource = new EventSource(`${API_URL}/api/presentations/${presentationId}/stream`);
+            const streamUrl = apiClient.getPresentationStreamUrl(presentationId, user?.id);
+            eventSource = new EventSource(streamUrl);
 
             eventSource.onopen = () => {
               console.log('[SSE] Connection established');
@@ -130,21 +125,18 @@ export default function PresentationPage() {
               if (!fallbackInterval) {
                 fallbackInterval = setInterval(async () => {
                   try {
-                    const pollResponse = await fetch(`${API_URL}/api/presentations/${presentationId}`);
-                    if (pollResponse.ok) {
-                      const pollData = await pollResponse.json();
-                      const updatedPres = pollData.presentation;
-                      setCurrentPresentation(updatedPres);
+                    const pollData = await apiClient.getPresentation(presentationId, user?.id);
+                    const updatedPres = pollData.presentation;
+                    setCurrentPresentation(updatedPres);
+                    
+                    if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
+                      if (fallbackInterval) {
+                        clearInterval(fallbackInterval);
+                        fallbackInterval = null;
+                      }
                       
-                      if (updatedPres.status === 'completed' || updatedPres.status === 'failed') {
-                        if (fallbackInterval) {
-                          clearInterval(fallbackInterval);
-                          fallbackInterval = null;
-                        }
-                        
-                        if (updatedPres.status === 'failed') {
-                          usePresentationStore.getState().setError(updatedPres.error_message || 'Presentation generation failed');
-                        }
+                      if (updatedPres.status === 'failed') {
+                        usePresentationStore.getState().setError(updatedPres.error_message || 'Presentation generation failed');
                       }
                     }
                   } catch (pollError) {

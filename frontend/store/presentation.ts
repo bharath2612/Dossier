@@ -117,7 +117,7 @@ export const usePresentationStore = create<PresentationStore>()(
         set({ saving: true, saveError: null });
 
         try {
-          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const { apiClient } = await import('@/lib/api/client');
           
           // Prepare update payload - save the entire presentation state
           // This handles both slides (legacy) and content_blocks (new widget-based editor)
@@ -131,24 +131,13 @@ export const usePresentationStore = create<PresentationStore>()(
           if (currentPresentation.theme) updates.theme = currentPresentation.theme;
           if (currentPresentation.citation_style) updates.citation_style = currentPresentation.citation_style;
 
-          const response = await fetch(
-            `${API_URL}/api/presentations/${currentPresentation.id}?user_id=${userId}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(updates),
-            }
+          const response = await apiClient.updatePresentation(
+            currentPresentation.id,
+            updates,
+            userId
           );
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Failed to save presentation');
-          }
-
-          const data = await response.json();
-          const savedPresentation = data.presentation;
+          const savedPresentation = response.presentation;
 
           set({
             currentPresentation: savedPresentation,

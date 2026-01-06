@@ -79,3 +79,4 @@ Your metadata is already configured in `app/layout.tsx` with:
 Just add the `og-image.png` file to the `public` folder and you're done!
 
 
+

@@ -9,9 +9,9 @@
                        │
                        ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                   FRONTEND (Vercel)                          │
+│              FULL-STACK (Vercel - Next.js App Router)        │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  Next.js 14 App Router                               │   │
+│  │  Frontend (Next.js 16 App Router)                    │   │
 │  │  - Landing Page                                      │   │
 │  │  - Outline Editor                                    │   │
 │  │  - Presentation Viewer/Editor                        │   │
@@ -24,27 +24,25 @@
 │  │  - Draft Store                                       │   │
 │  │  - UI Store                                          │   │
 │  └──────────────────────────────────────────────────────┘   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ↓
-┌─────────────────────────────────────────────────────────────┐
-│              BACKEND (GCP Cloud Run)                         │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  API Endpoints                                       │   │
+│  │  API Route Handlers (app/api/)                       │   │
 │  │  - POST /api/preprocess                              │   │
 │  │  - POST /api/generate-outline                        │   │
 │  │  - POST /api/generate-presentation                   │   │
-│  │  - PATCH /api/presentations/:id                      │   │
-│  │  - POST /api/presentations/:id/duplicate             │   │
-│  │  - DELETE /api/presentations/:id                     │   │
-│  │  - POST /api/export/pdf                              │   │
+│  │  - GET /api/presentations/:id/stream (SSE)          │   │
+│  │  - CRUD endpoints for drafts & presentations         │   │
 │  └──────────────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  AI Agent Pipeline                                   │   │
+│  │  AI Agents (lib/agents/)                             │   │
 │  │  1. Pre-processor Agent → validates/enhances prompt  │   │
 │  │  2. Research Agent → web search (Brave API)          │   │
 │  │  3. Outline Agent → generates slide outline          │   │
 │  │  4. Slide Generator Agent → full content             │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Services (lib/services/)                            │   │
+│  │  - Draft Store (Supabase)                            │   │
+│  │  - Presentation Store (Supabase)                     │   │
 │  └──────────────────────────────────────────────────────┘   │
 └──────────────────────┬──────────────────────────────────────┘
                        │
@@ -302,12 +300,12 @@ interface UIStore {
 - **Domain:** TBD
 - **CDN:** Vercel Edge Network
 
-### Backend (GCP Cloud Run)
-- **Region:** us-central1 (default)
-- **Concurrency:** 80 requests per instance
-- **Timeout:** 10 minutes (for long generations)
-- **Min instances:** 0 (cost optimization)
-- **Max instances:** 10 (MVP)
+### Backend (Next.js API Routes on Vercel)
+- **Platform:** Vercel Serverless Functions
+- **Runtime:** Node.js (default)
+- **Timeout:** 60s (Hobby), 300s (Pro) - background generation pattern used for longer operations
+- **Region:** Global (Vercel Edge Network)
+- **Scaling:** Automatic based on traffic
 
 ### Database (Supabase)
 - **Plan:** Free tier initially

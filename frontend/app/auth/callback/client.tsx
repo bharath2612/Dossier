@@ -46,42 +46,24 @@ export function AuthCallbackClient() {
       
       const generate = async () => {
         try {
-          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          // Import apiClient dynamically to avoid SSR issues
+          const { apiClient } = await import('@/lib/api/client');
           
           // First ensure user exists in database
-          const userResponse = await fetch(`${API_URL}/api/users/ensure`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: user.id,
-              email: user.email,
-            }),
+          await apiClient.ensureUser({
+            user_id: user.id,
+            email: user.email,
           });
-
-          if (!userResponse.ok) {
-            const errorData = await userResponse.json();
-            throw new Error(errorData.error || 'Failed to create user record');
-          }
 
           // Generate presentation
-          const response = await fetch(`${API_URL}/api/generate-presentation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              draft_id: currentDraft.id,
-              outline,
-              citation_style: citationStyle,
-              theme: theme,
-              user_id: user.id,
-            }),
+          const result = await apiClient.generatePresentation({
+            draft_id: currentDraft.id,
+            outline,
+            citation_style: citationStyle,
+            theme: theme,
+            user_id: user.id,
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to generate presentation');
-          }
-
-          const result = await response.json();
           console.log('[AuthCallback] Success, going to presentation');
           
           // Redirect to presentation page which will show generating status

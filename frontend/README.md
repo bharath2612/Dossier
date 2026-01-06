@@ -20,7 +20,8 @@ The frontend application for Dossier, built with Next.js 14, React 19, and TypeS
 - Node.js >= 18.0.0
 - npm, yarn, pnpm, or bun
 - A Supabase project (for authentication and data storage)
-- Backend API URL (see main README for backend setup)
+- Anthropic API key (for Claude AI)
+- Brave Search API key (for web research)
 
 ### Installation
 
@@ -40,10 +41,17 @@ The frontend application for Dossier, built with Next.js 14, React 19, and TypeS
 
 3. Configure environment variables in `.env.local`:
    ```bash
-   NEXT_PUBLIC_API_URL=http://localhost:8080
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   # Supabase
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   
+   # AI Services
+   ANTHROPIC_API_KEY=your_anthropic_key
+   BRAVE_SEARCH_API_KEY=your_brave_key
+   
+   # App
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
 4. Run the development server:
@@ -62,6 +70,13 @@ The frontend application for Dossier, built with Next.js 14, React 19, and TypeS
 ```
 frontend/
 ├── app/                    # Next.js App Router pages
+│   ├── api/               # API Route Handlers (backend endpoints)
+│   │   ├── preprocess/
+│   │   ├── generate-outline/
+│   │   ├── generate-presentation/
+│   │   ├── drafts/
+│   │   ├── presentations/
+│   │   └── users/
 │   ├── auth/              # Authentication pages
 │   ├── dashboard/         # User dashboard
 │   ├── outline/           # Outline editor
@@ -75,11 +90,13 @@ frontend/
 │   ├── presentation/     # Presentation components
 │   └── ui/               # Reusable UI components
 ├── lib/                   # Utility libraries
+│   ├── agents/           # AI agents (preprocessor, research, outline, slide-generator)
 │   ├── api/              # API client
+│   ├── services/         # Data access layer (draft-store, presentation-store)
 │   ├── export/           # Export utilities
-│   ├── supabase/         # Supabase client
+│   ├── supabase/         # Supabase clients
 │   ├── themes/           # Theme configuration
-│   └── utils/            # General utilities
+│   └── utils/            # General utilities (anthropic, brave-search)
 ├── store/                 # Zustand state management
 ├── hooks/                 # React hooks
 └── public/                # Static assets
@@ -126,7 +143,9 @@ State is managed using Zustand stores in the `store/` directory:
 
 ### API Integration
 
-API calls are handled through `lib/api/client.ts`. The API client provides type-safe methods for communicating with the backend.
+API calls are handled through `lib/api/client.ts`. The API client provides type-safe methods for communicating with Next.js API routes. All endpoints are served from `/api/*` routes within the same Next.js application.
+
+**Note:** This is a full-stack Next.js application. The backend logic (AI agents, database operations) runs as Next.js API Route Handlers, not as a separate service.
 
 ## Building for Production
 
