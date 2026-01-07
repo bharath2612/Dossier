@@ -14,13 +14,14 @@ import type { Presentation } from '@/types/presentation';
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const { clearDraft } = useDraftStore();
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const hasFetchedRef = useRef(false);
   const sseConnectionsRef = useRef<Map<string, EventSource>>(new Map());
   
@@ -61,7 +62,7 @@ function DashboardContent() {
     }
 
     if (!user) {
-      router.push('/');
+      // Don't redirect - show sign-in UI instead
       return;
     }
 
@@ -70,7 +71,7 @@ function DashboardContent() {
       hasFetchedRef.current = true;
       fetchPresentations();
     }
-  }, [user, authLoading, fetchPresentations, router]);
+  }, [user, authLoading, fetchPresentations]);
 
   // Use SSE for real-time updates on generating presentations
   useEffect(() => {
@@ -204,7 +205,129 @@ function DashboardContent() {
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (authLoading || loading) {
+  const handleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      await signInWithGoogle();
+      // The page will redirect to Google, then back via callback
+    } catch (err) {
+      console.error('Sign in error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setIsSigningIn(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
+        <div className="text-center">
+          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-border border-t-brand mx-auto" />
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show sign-in UI if user is not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background text-foreground grid-pattern">
+        {/* Header */}
+        <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="mx-auto max-w-7xl px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Image 
+                  src="/logo.png" 
+                  alt="Dossier AI" 
+                  width={32} 
+                  height={32}
+                  className="h-8 w-8"
+                />
+                <span className="text-sm font-medium">Dossier AI</span>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+
+        {/* Sign-in content */}
+        <div className="mx-auto max-w-7xl px-6 py-20">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-md">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border bg-card">
+                <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              
+              <p className="mb-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Authentication Required
+              </p>
+              <h1 className="mb-4 text-2xl font-semibold tracking-tight">Sign in to access your Dashboard</h1>
+              <p className="mb-8 text-sm text-muted-foreground">
+                Sign in with your Google account to view and manage your presentations
+              </p>
+
+              {error && (
+                <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+                  <p className="text-sm text-destructive">{error}</p>
+                  <button 
+                    onClick={() => setError(null)}
+                    className="mt-2 text-xs text-destructive hover:underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              <Button
+                onClick={handleSignIn}
+                disabled={isSigningIn}
+                variant="default"
+                size="lg"
+                className="w-full sm:w-auto"
+              >
+                {isSigningIn ? (
+                  <span>Signing in...</span>
+                ) : (
+                  <>
+                    <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                    Continue with Google
+                  </>
+                )}
+              </Button>
+
+              <p className="mt-8 text-xs text-muted-foreground">
+                Don't have an account? Signing in will create one automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
         <div className="text-center">
@@ -215,10 +338,6 @@ function DashboardContent() {
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   // Check if there's a generating presentation
