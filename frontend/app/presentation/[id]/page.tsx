@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, useRef } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { SlideCanvas } from '@/components/presentation/editor/slide-canvas';
@@ -13,11 +13,13 @@ import { usePresentationStore } from '@/store/presentation';
 import { AutoSaveIndicator } from '@/components/outline/auto-save-indicator';
 import type { Presentation, Slide } from '@/types/presentation';
 
-export default function PresentationPage() {
+function PresentationPageContent() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const presentationId = params.id as string;
+  const shouldGenerate = searchParams.get('generate') === 'true';
 
   // Use store for presentation state
   const {
@@ -48,6 +50,66 @@ export default function PresentationPage() {
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
+
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
+    // If generate=true, this is a draft ID and we need to create a presentation first
+    const handleGenerateFromDraft = async () => {
+      if (!user) {
+        // Redirect to home if not authenticated
+        router.push('/');
+        return;
+      }
+
+      try {
+        usePresentationStore.getState().setLoading(true);
+
+        // Fetch the draft first
+        const draftResponse = await fetch(`/api/drafts/${presentationId}`);
+        if (!draftResponse.ok) {
+          throw new Error('Draft not found. Please try generating again.');
+        }
+        const draftData = await draftResponse.json();
+        const draft = draftData.draft;
+
+        if (!draft || !draft.outline) {
+          throw new Error('Invalid draft data');
+        }
+
+        // Create presentation from draft
+        const generateResponse = await fetch('/api/generate-presentation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            draft_id: presentationId,
+            outline: draft.outline,
+            citation_style: 'inline',
+            theme: 'minimal',
+            user_id: user.id,
+          }),
+        });
+
+        if (!generateResponse.ok) {
+          const errorData = await generateResponse.json();
+          throw new Error(errorData.error || 'Failed to generate presentation');
+        }
+
+        const result = await generateResponse.json();
+
+        // Redirect to the actual presentation page (without generate=true)
+        router.replace(`/presentation/${result.presentation_id}`);
+      } catch (err) {
+        console.error('Error generating presentation from draft:', err);
+        usePresentationStore.getState().setError(err instanceof Error ? err.message : 'Failed to generate presentation');
+        usePresentationStore.getState().setLoading(false);
+      }
+    };
+
+    if (shouldGenerate) {
+      handleGenerateFromDraft();
+      return;
+    }
 
     const fetchPresentation = async () => {
       try {
@@ -176,7 +238,7 @@ export default function PresentationPage() {
         clearInterval(fallbackInterval);
       }
     };
-  }, [presentationId]);
+  }, [presentationId, authLoading, shouldGenerate, user, router]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -604,5 +666,26 @@ export default function PresentationPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
+      <div className="text-center">
+        <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-border border-t-brand mx-auto" />
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          Loading presentation
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function PresentationPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PresentationPageContent />
+    </Suspense>
   );
 }

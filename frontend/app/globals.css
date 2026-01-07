@@ -238,3 +238,60 @@ html.no-transition,
 html.no-transition * {
   transition: none !important;
 }
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Blinking cursor animation for typewriter effect */
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Typing cursor for streaming effect */
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: var(--brand);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: blink 0.7s step-end infinite;
+}
+
+/* Smooth progress bar animation */
+@keyframes progress-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.progress-pulse {
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+/* Indeterminate progress animation */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+}

@@ -122,3 +122,70 @@ export async function callClaude(
   throw new Error(`Claude API call failed after ${retries + 1} attempts: ${lastError?.message}`);
 }
 
+// Streaming version of callClaude for SSE-based outline generation
+export async function* streamClaude(
+  systemPrompt: string,
+  userPrompt: string,
+  options: {
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+  } = {}
+): AsyncGenerator<string, void, unknown> {
+  const {
+    model = 'claude-sonnet-4-5-20250929',
+    maxTokens = 4096,
+    temperature = 0.7,
+  } = options;
+
+  // Check if API key is available
+  const runtimeApiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!runtimeApiKey || runtimeApiKey.trim() === '') {
+    throw new Error('ANTHROPIC_API_KEY is not set. Please add it to your .env.local file and restart the dev server.');
+  }
+
+  // Create client config
+  const baseURL = process.env.ANTHROPIC_BASE_URL;
+  const isValidBaseURL = baseURL && !baseURL.includes('localhost') && !baseURL.includes('127.0.0.1');
+
+  const clientConfig: { apiKey: string; maxRetries: number; timeout: number; baseURL?: string } = {
+    apiKey: runtimeApiKey,
+    maxRetries: 0,
+    timeout: 120000, // 2 minutes for streaming
+  };
+
+  if (isValidBaseURL) {
+    clientConfig.baseURL = baseURL;
+  }
+
+  const runtimeClient = new Anthropic(clientConfig);
+
+  try {
+    const stream = runtimeClient.messages.stream({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: userPrompt,
+        },
+      ],
+    });
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta') {
+        const delta = event.delta;
+        if ('text' in delta) {
+          yield delta.text;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Stream Claude error:', error);
+    throw new Error(`Stream failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+

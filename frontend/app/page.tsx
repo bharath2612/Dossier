@@ -1,119 +1,102 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { Suspense, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { LayoutDashboard } from 'lucide-react';
-import { GenerationProgress } from '@/components/outline/generation-progress';
-import { OutlineEditor } from '@/components/outline/outline-editor';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { LayoutDashboard, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { apiClient } from '@/lib/api/client';
-import { useDraftStore } from '@/store/draft';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/hooks/useAuth';
-import type { GenerateOutlineResponse } from '@/lib/api/client';
+import { useOutlineGenerationStore } from '@/store/outline-generation';
+import { useOutlineStream } from '@/lib/hooks/useOutlineStream';
+import {
+  PromptInput,
+  PromptBanner,
+  ResearchFeed,
+  OutlineList,
+  GenerateCTA,
+} from '@/components/outline-generator';
+import type { GenerationMode } from '@/store/types';
 
-type Stage = 'input' | 'generating' | 'editing';
-
-function LandingPageContent() {
+function OutlineGeneratorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, loading } = useAuth();
-  const [stage, setStage] = useState<Stage>('input');
-  const [prompt, setPrompt] = useState('');
-  const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [outline, setOutline] = useState<GenerateOutlineResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
 
-  const { setOutline: setDraftOutline, setCurrentDraft, outline: storedOutline } = useDraftStore();
+  const store = useOutlineGenerationStore();
+  const { startGeneration, cancel } = useOutlineStream();
 
-  // Check for auth/generation errors
+  const {
+    status,
+    slides,
+    error,
+    originalPrompt,
+    enhancedPrompt,
+    mode,
+    researchSources,
+    researchCollapsed,
+    draftId,
+    setResearchCollapsed,
+    reset,
+    setError,
+  } = store;
+
+  // Handle URL state for draft restoration
   useEffect(() => {
-    const urlError = searchParams.get('error');
-    if (urlError === 'auth_failed') {
-      setError('Authentication failed. Please try again.');
-      // If we have an outline, go to editor so user can retry
-      if (storedOutline) {
-        setStage('editing');
-      }
+    const draftParam = searchParams.get('draft');
+    if (draftParam && status === 'idle') {
+      // TODO: Implement draft restoration from URL
+      // This would fetch the draft and restore state
     }
-  }, [searchParams, storedOutline]);
+  }, [searchParams, status]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (prompt.trim().length < 10) return;
-
-    setError(null);
-    setStage('generating');
-    setCurrentStep(0);
-    setProgress(0);
-
-    try {
-      setCurrentStep(0);
-      setProgress(10);
-
-      const preprocessResult = await apiClient.preprocessPrompt(prompt);
-      setProgress(20);
-
-      setCurrentStep(1);
-      setProgress(30);
-
-      const outlineResult = await apiClient.generateOutline(
-        preprocessResult.enhanced_prompt,
-        (p) => {
-          setProgress(30 + p * 0.7);
-          if (p > 50) setCurrentStep(2);
-        }
-      );
-
-      setOutline(outlineResult);
-      setProgress(100);
-      setCurrentStep(3);
-
-      // Sync to Draft Store and go directly to editor
-      setCurrentDraft({
-        id: outlineResult.draft_id,
-        title: outlineResult.title,
-        prompt: prompt,
-        enhanced_prompt: '',
-        outline: {
-          title: outlineResult.title,
-          slides: outlineResult.outline.slides,
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      setDraftOutline({
-        title: outlineResult.title,
-        slides: outlineResult.outline.slides,
-      });
-
-      setTimeout(() => setStage('editing'), 500);
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate outline');
-      setStage('input');
+  // Update URL when draft is created
+  useEffect(() => {
+    if (draftId && status !== 'idle') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('draft', draftId);
+      window.history.replaceState({}, '', url.toString());
     }
-  };
+  }, [draftId, status]);
 
-  const handleStartOver = () => {
-    setStage('input');
-    setPrompt('');
-    setOutline(null);
-    setError(null);
-  };
+  // Clear URL when reset
+  useEffect(() => {
+    if (status === 'idle' && !draftId) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('draft');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [status, draftId]);
 
-  const handleBackToInput = () => {
-    setStage('input');
-    setPrompt('');
-    setOutline(null);
-    setError(null);
-  };
+  // Handle form submission
+  const handleSubmit = useCallback(
+    async (prompt: string, selectedMode: GenerationMode) => {
+      setError(null);
+      await startGeneration(prompt, selectedMode);
+    },
+    [startGeneration, setError]
+  );
+
+  // Handle cancel
+  const handleCancel = useCallback(() => {
+    cancel();
+  }, [cancel]);
+
+  // Handle start over
+  const handleStartOver = useCallback(() => {
+    reset();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('draft');
+    window.history.replaceState({}, '', url.toString());
+  }, [reset]);
+
+  const isIdle = status === 'idle';
+  const isGenerating = status === 'preprocessing' || status === 'researching' || status === 'generating';
+  const isComplete = status === 'complete';
+  const hasError = status === 'error';
 
   // Show loading state while checking auth
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background grid-pattern">
         <div className="text-center">
@@ -129,143 +112,125 @@ function LandingPageContent() {
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern">
       {/* Header */}
-      {stage === 'input' && (
-        <header className="fixed left-0 right-0 top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-3">
-              <Image 
-                src="/logo.png" 
-                alt="Dossier AI" 
-                width={32} 
-                height={32}
-                className="h-8 w-8"
-              />
-              <span className="text-sm font-medium text-foreground">Dossier AI</span>
-            </div>
-            <div className="flex items-center gap-3">
-              {user && (
+      <header className="fixed left-0 right-0 top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt="Dossier AI"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
+            <span className="text-sm font-medium text-foreground">Dossier AI</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {!isIdle && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleStartOver}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Start over
+              </Button>
+            )}
+            {user && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/dashboard')}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </Button>
+            )}
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="pt-20 px-6 pb-12">
+        {/* Error Display */}
+        {(error || hasError) && (
+          <div className="w-full max-w-3xl mx-auto mb-6">
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm text-destructive">{error || 'An error occurred'}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-destructive hover:text-destructive/80"
+                >
+                  &times;
+                </button>
+              </div>
+              {hasError && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push('/dashboard')}
+                  onClick={handleStartOver}
+                  className="mt-3"
                 >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
+                  Try Again
                 </Button>
               )}
-              <ThemeToggle />
             </div>
           </div>
-        </header>
-      )}
+        )}
 
-      {/* Stage: Input */}
-      {stage === 'input' && (
-        <div className="flex min-h-screen flex-col items-center justify-center px-6 pt-16">
-          <div className="w-full max-w-3xl">
-            {/* Error */}
-            {error && (
-              <div className="mb-8 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
+        {/* Input Stage */}
+        {isIdle && (
+          <div className="flex min-h-[calc(100vh-200px)] flex-col items-center justify-center">
+            <PromptInput onSubmit={handleSubmit} disabled={false} />
+
+            {/* Footer */}
+            <div className="fixed bottom-6 text-center">
+              <p className="font-mono text-xs text-muted-foreground">
+                No signup required • Sign in after outline
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Generation/Complete Stage */}
+        {!isIdle && (
+          <div className="w-full">
+            {/* Prompt Banner */}
+            <PromptBanner
+              originalPrompt={originalPrompt}
+              enhancedPrompt={enhancedPrompt}
+              mode={mode}
+              status={status}
+              onCancel={isGenerating ? handleCancel : undefined}
+            />
+
+            {/* Research Feed (Research mode only) */}
+            {mode === 'research' && (
+              <ResearchFeed
+                sources={researchSources}
+                status={status}
+                isCollapsed={researchCollapsed}
+                onToggleCollapse={setResearchCollapsed}
+              />
             )}
 
-            {/* Caption */}
-            <div className="mb-4 text-center">
-              <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                AI-Powered Research
-              </span>
-            </div>
+            {/* Outline List */}
+            <OutlineList
+              slides={slides}
+              status={status}
+              streamingBuffer={store.streamingBuffer}
+              currentStreamingSlide={store.currentStreamingSlide}
+            />
 
-            {/* Headline */}
-            <div className="mb-12 text-center">
-              <h1 className="mb-4 text-4xl font-semibold tracking-tight sm:text-5xl">
-                Research-backed presentations
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Generate presentations backed by credible sources. No fluff.
-              </p>
-            </div>
-
-            {/* Input Form */}
-            <form onSubmit={handleSubmit} className="mb-8">
-              <div className="relative">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your presentation topic..."
-                  className="w-full resize-none rounded-lg border border-border bg-card px-5 py-4 pr-32 text-base leading-relaxed text-foreground placeholder-muted-foreground outline-none transition-all focus:border-brand focus:ring-2 focus:ring-brand/20"
-                  rows={4}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={prompt.trim().length < 10}
-                  className="absolute bottom-4 right-4 rounded-md bg-brand px-6 py-2.5 text-sm font-medium text-brand-foreground transition-all hover:bg-[#0f6640] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Generate
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Press <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs">⌘</kbd> +{' '}
-                <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs">Enter</kbd> to generate
-              </p>
-            </form>
-
-            {/* Examples */}
-            <div className="text-center">
-              <p className="mb-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                Try an example
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  'Sales strategies for B2B SaaS',
-                  'Building remote teams',
-                  'Sustainable energy future',
-                ].map((example) => (
-                  <button
-                    key={example}
-                    onClick={() => setPrompt(example)}
-                    className="rounded-md border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-all hover:border-brand/50 hover:text-foreground"
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Generate CTA */}
+            {isComplete && (
+              <GenerateCTA slideCount={slides.length} draftId={draftId} />
+            )}
           </div>
-
-          {/* Footer */}
-          <div className="fixed bottom-6 text-center">
-            <p className="font-mono text-xs text-muted-foreground">
-              No signup required • Sign in after outline
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Stage: Generating */}
-      {stage === 'generating' && (
-        <div className="flex min-h-screen items-center justify-center px-6">
-          <div className="w-full max-w-2xl">
-            <p className="mb-4 text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Processing
-            </p>
-            <h2 className="mb-12 text-center text-3xl font-semibold tracking-tight">
-              Generating outline...
-            </h2>
-            <GenerationProgress currentStep={currentStep} progress={progress} />
-          </div>
-        </div>
-      )}
-
-      {/* Stage: Editing */}
-      {stage === 'editing' && <OutlineEditor onBack={handleBackToInput} />}
+        )}
+      </main>
     </div>
   );
 }
@@ -283,10 +248,10 @@ function LoadingFallback() {
   );
 }
 
-export default function LandingPage() {
+export default function OutlineGeneratorPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <LandingPageContent />
+      <OutlineGeneratorContent />
     </Suspense>
   );
 }

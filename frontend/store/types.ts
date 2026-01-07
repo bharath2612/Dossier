@@ -94,3 +94,37 @@ export interface User {
   created_at: string;
   updated_at: string;
 }
+
+// Outline Generation V2 Types
+export type GenerationMode = 'fast' | 'research';
+
+export type GenerationStatus =
+  | 'idle'
+  | 'preprocessing'
+  | 'researching'
+  | 'generating'
+  | 'complete'
+  | 'error';
+
+export interface ResearchSource {
+  domain: string;
+  favicon: string;
+}
+
+export interface GeneratedSlide {
+  index: number;
+  title: string;
+  bullets: string[];
+}
+
+// SSE Event Types for streaming
+export type SSEEvent =
+  | { type: 'preprocessing'; status: 'start' | 'complete'; enhanced_prompt?: string; original_prompt?: string }
+  | { type: 'research_query'; query: string }
+  | { type: 'research_source'; source: ResearchSource }
+  | { type: 'research_complete'; sourceCount: number }
+  | { type: 'content_chunk'; chunk: string }
+  | { type: 'slide_complete'; index: number; parsed: GeneratedSlide }
+  | { type: 'draft_created'; draftId: string }
+  | { type: 'complete'; slideCount: number }
+  | { type: 'error'; message: string }
