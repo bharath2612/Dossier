@@ -240,23 +240,26 @@ function DashboardContent() {
               />
               <span className="text-sm font-medium">Dossier AI</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
                 disabled={refreshing}
+                className="sm:w-auto"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
+                <span className="hidden sm:inline ml-2">Refresh</span>
               </Button>
               <Button
                 variant="brand"
                 size="sm"
                 onClick={handleNewPresentation}
+                className="sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
-                New Presentation
+                <span className="hidden sm:inline ml-2">New Presentation</span>
+                <span className="inline sm:hidden ml-1">Create</span>
               </Button>
               <ThemeToggle />
             </div>

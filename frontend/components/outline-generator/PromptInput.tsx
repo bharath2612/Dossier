@@ -126,38 +126,38 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
         </div>
 
         {/* Mode Toggle + Submit */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-4 flex items-center justify-between gap-2">
           {/* Mode Pills */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setMode('fast')}
               disabled={disabled}
               className={cn(
-                'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all',
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-all sm:px-4 sm:py-2',
                 mode === 'fast'
                   ? 'bg-brand text-brand-foreground'
                   : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
-              <Sparkles className="h-4 w-4" />
-              Fast
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Fast</span>
             </button>
             <button
               type="button"
               onClick={() => setMode('research')}
               disabled={disabled}
               className={cn(
-                'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all',
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium transition-all sm:px-4 sm:py-2',
                 mode === 'research'
                   ? 'bg-brand text-brand-foreground'
                   : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
-              <Search className="h-4 w-4" />
-              Research
+              <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Research</span>
             </button>
           </div>
 
@@ -166,13 +166,14 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
             type="submit"
             disabled={!isValid || disabled}
             className={cn(
-              'flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-medium text-brand-foreground transition-all',
+              'flex items-center gap-1.5 rounded-lg bg-brand px-4 py-1.5 text-xs sm:text-sm font-medium text-brand-foreground transition-all sm:px-6 sm:py-2.5',
               'hover:bg-[#0f6640]',
-              'disabled:cursor-not-allowed disabled:opacity-40'
+              'disabled:cursor-not-allowed disabled:opacity-40',
+              'whitespace-nowrap'
             )}
           >
             <span>Generate</span>
-            <span className="text-xs opacity-60 ml-1">
+            <span className="text-xs opacity-60 hidden sm:inline">
               {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}+↵
             </span>
           </button>

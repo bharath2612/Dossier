@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties } from 'react';
+import { CSSProperties, useEffect, useState } from 'react';
 import { getTheme } from '@/lib/themes';
 import type { Slide, CitationStyle, Theme, ImagePosition } from '@/types/presentation';
 
@@ -13,20 +13,40 @@ interface SlideViewerProps {
 export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
   const themeConfig = getTheme(theme);
 
-  // Common styles
+  // Detect mobile viewport
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [theme]);
+
+  // Use slide-specific background color if set, otherwise use theme
+  const backgroundColor = slide.background_color || themeConfig.colors.background;
+
+  // Responsive scaling factors
+  const scale = isMobile ? 0.5 : 1; // 50% scale for mobile
+  const padding = isMobile ? '24px 16px' : '64px 48px';
+
+  // Common styles with higher specificity - use slide background override if present
   const containerStyle: CSSProperties = {
-    background: themeConfig.colors.background,
+    backgroundColor: backgroundColor,
     color: themeConfig.colors.text,
     fontFamily: themeConfig.typography.fontFamily,
     width: '100%',
-    maxWidth: '1200px',
-    minHeight: '500px',
+    maxWidth: isMobile ? '100%' : '1200px',
+    minHeight: isMobile ? 'auto' : '500px',
     position: 'relative',
     overflow: 'hidden',
   };
 
   const titleStyle: CSSProperties = {
-    fontSize: `${themeConfig.typography.titleSize}px`,
+    fontSize: `${themeConfig.typography.titleSize * scale}px`,
     fontWeight: themeConfig.typography.titleWeight,
     lineHeight: 1.2,
     color: themeConfig.colors.text,
@@ -34,7 +54,7 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
   };
 
   const bodyStyle: CSSProperties = {
-    fontSize: `${themeConfig.typography.bodySize}px`,
+    fontSize: `${themeConfig.typography.bodySize * scale}px`,
     fontWeight: themeConfig.typography.bodyWeight,
     lineHeight: 1.6,
     color: themeConfig.colors.text,
@@ -90,6 +110,8 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
   // Layout wrapper with image support
   const renderWithImage = (content: React.ReactNode) => {
     const imagePosition = slide.image?.position || 'none';
+    const gap = isMobile ? '16px' : '32px';
+    const marginTop = isMobile ? '12px' : '24px';
 
     if (imagePosition === 'background') {
       return (
@@ -106,12 +128,12 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
       return (
         <div style={{
           display: 'flex',
-          flexDirection: imagePosition === 'left' ? 'row' : 'row-reverse',
-          gap: '32px',
+          flexDirection: isMobile ? 'column' : (imagePosition === 'left' ? 'row' : 'row-reverse'),
+          gap,
           alignItems: 'flex-start',
-          padding: '64px 48px',
+          padding,
         }}>
-          <div style={{ flex: '0 0 40%' }}>
+          <div style={{ flex: isMobile ? '1' : '0 0 40%' }}>
             {renderImage(imagePosition)}
           </div>
           <div style={{ flex: 1 }}>
@@ -123,9 +145,9 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
 
     if (imagePosition === 'top') {
       return (
-        <div style={{ padding: '64px 48px' }}>
+        <div style={{ padding }}>
           {renderImage('top')}
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop }}>
             {content}
           </div>
         </div>
@@ -134,16 +156,16 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
 
     if (imagePosition === 'bottom') {
       return (
-        <div style={{ padding: '64px 48px' }}>
+        <div style={{ padding }}>
           {content}
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop }}>
             {renderImage('bottom')}
           </div>
         </div>
       );
     }
 
-    return <div style={{ padding: '64px 48px' }}>{content}</div>;
+    return <div style={{ padding }}>{content}</div>;
   };
 
   // Render citations
@@ -155,15 +177,15 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
     if (citationStyle === 'footnote') {
       return (
         <div style={{
-          marginTop: '32px',
-          paddingTop: '16px',
+          marginTop: isMobile ? '16px' : '32px',
+          paddingTop: isMobile ? '8px' : '16px',
           borderTop: `1px solid ${themeConfig.colors.border}`,
         }}>
           {slide.citations.map((citation, idx) => (
             <p
               key={idx}
               style={{
-                fontSize: '12px',
+                fontSize: isMobile ? '10px' : '12px',
                 color: themeConfig.colors.textSecondary,
                 marginBottom: '4px',
               }}
@@ -185,12 +207,16 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
         <div style={containerStyle}>
           {renderWithImage(
             <>
-              <h1 style={{ ...titleStyle, fontSize: `${themeConfig.typography.titleSize + 8}px`, marginBottom: '32px' }}>
+              <h1 style={{
+                ...titleStyle,
+                fontSize: `${(themeConfig.typography.titleSize + 8) * scale}px`,
+                marginBottom: isMobile ? '16px' : '32px'
+              }}>
                 {slide.title}
               </h1>
 
               {slide.body.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '16px' }}>
                   {slide.body.map((bullet, idx) => (
                     <p key={idx} style={secondaryTextStyle}>
                       {bullet}
@@ -213,16 +239,16 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: '300px',
+              minHeight: isMobile ? '150px' : '300px',
               textAlign: 'center',
             }}>
               <div>
                 <blockquote style={{
-                  fontSize: `${themeConfig.typography.titleSize - 8}px`,
+                  fontSize: `${(themeConfig.typography.titleSize - 8) * scale}px`,
                   fontWeight: 500,
                   lineHeight: 1.5,
                   color: themeConfig.colors.text,
-                  marginBottom: '24px',
+                  marginBottom: isMobile ? '12px' : '24px',
                 }}>
                   "{slide.title}"
                 </blockquote>
@@ -248,15 +274,15 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
         <div style={containerStyle}>
           {renderWithImage(
             <>
-              <h2 style={{ ...titleStyle, marginBottom: '32px' }}>
+              <h2 style={{ ...titleStyle, marginBottom: isMobile ? '16px' : '32px' }}>
                 {slide.title}
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '24px' }}>
                 {slide.body.map((bullet, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '8px' : '16px' }}>
                     <div style={{
-                      fontSize: '32px',
+                      fontSize: isMobile ? '16px' : '32px',
                       fontWeight: 700,
                       color: themeConfig.colors.accent,
                       flexShrink: 0,
@@ -265,8 +291,8 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
                     </div>
                     <p style={{
                       ...bodyStyle,
-                      fontSize: `${themeConfig.typography.bodySize + 4}px`,
-                      paddingTop: '8px',
+                      fontSize: `${(themeConfig.typography.bodySize + 4) * scale}px`,
+                      paddingTop: isMobile ? '4px' : '8px',
                     }}>
                       {bullet}
                     </p>
@@ -285,19 +311,23 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
         <div style={containerStyle}>
           {renderWithImage(
             <>
-              <h2 style={{ ...titleStyle, fontSize: `${themeConfig.typography.titleSize + 8}px`, marginBottom: '32px' }}>
+              <h2 style={{
+                ...titleStyle,
+                fontSize: `${(themeConfig.typography.titleSize + 8) * scale}px`,
+                marginBottom: isMobile ? '16px' : '32px'
+              }}>
                 {slide.title}
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '10px' : '20px' }}>
                 {slide.body.map((bullet, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '8px' : '16px' }}>
                     <div style={{
-                      width: '8px',
-                      height: '8px',
+                      width: isMobile ? '6px' : '8px',
+                      height: isMobile ? '6px' : '8px',
                       borderRadius: '50%',
                       backgroundColor: themeConfig.colors.accent,
-                      marginTop: '8px',
+                      marginTop: isMobile ? '6px' : '8px',
                       flexShrink: 0,
                     }} />
                     <p style={bodyStyle}>
@@ -319,19 +349,19 @@ export function SlideViewer({ slide, citationStyle, theme }: SlideViewerProps) {
         <div style={containerStyle}>
           {renderWithImage(
             <>
-              <h2 style={{ ...titleStyle, marginBottom: '32px' }}>
+              <h2 style={{ ...titleStyle, marginBottom: isMobile ? '16px' : '32px' }}>
                 {slide.title}
               </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '16px' }}>
                 {slide.body.map((bullet, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '8px' : '16px' }}>
                     <div style={{
-                      width: '6px',
-                      height: '6px',
+                      width: isMobile ? '4px' : '6px',
+                      height: isMobile ? '4px' : '6px',
                       borderRadius: '50%',
                       backgroundColor: themeConfig.colors.textSecondary,
-                      marginTop: '10px',
+                      marginTop: isMobile ? '8px' : '10px',
                       flexShrink: 0,
                     }} />
                     <p style={bodyStyle}>

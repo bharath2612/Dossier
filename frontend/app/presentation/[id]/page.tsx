@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard, AlertCircle } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Home, LayoutDashboard, AlertCircle, Monitor } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { SlideCanvas } from '@/components/presentation/editor/slide-canvas';
 import { SlideViewer } from '@/components/presentation/slide-viewer';
@@ -12,6 +12,20 @@ import { getTheme } from '@/lib/themes';
 import { usePresentationStore } from '@/store/presentation';
 import { AutoSaveIndicator } from '@/components/outline/auto-save-indicator';
 import type { Presentation, Slide } from '@/types/presentation';
+
+// Hook to detect mobile screen
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
 
 function PresentationPageContent() {
   const params = useParams();
@@ -40,6 +54,7 @@ function PresentationPageContent() {
   const [exporting, setExporting] = useState(false);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const generationStartedRef = useRef(false);
+  const isMobile = useIsMobile();
 
   // Set user ID in store
   useEffect(() => {
@@ -533,6 +548,81 @@ function PresentationPageContent() {
   const isFirst = currentSlide === 0;
   const isLast = currentSlide === presentation.slides.length - 1;
 
+  // Mobile view - show only vertical slide cards
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        {/* Mobile Header */}
+        <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span>Back</span>
+            </button>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        {/* Desktop Edit Banner */}
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Monitor className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                View-only mode
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-200 mt-0.5">
+                Use desktop to edit content and export PDF
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Presentation Title */}
+        <div className="px-4 py-4 border-b border-border">
+          <h1 className="text-lg font-semibold text-foreground">{presentation.title}</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            {presentation.slides.length} slides
+          </p>
+        </div>
+
+        {/* Vertical Slide Cards */}
+        <div className="px-4 py-4 space-y-4">
+          {presentation.slides.map((s, idx) => {
+            const slideTheme = getTheme(presentation.theme);
+            // Use slide-specific background if set, otherwise use theme
+            const bgColor = (s as any).background_color || slideTheme.colors.background;
+
+            return (
+              <div key={s.index} className="rounded-lg border border-border overflow-hidden">
+                <div className="px-3 py-2 border-b border-border bg-card">
+                  <span className="text-xs font-mono text-muted-foreground">
+                    Slide {idx + 1}
+                  </span>
+                </div>
+                <div style={{
+                  backgroundColor: bgColor,
+                  color: slideTheme.colors.text,
+                  isolation: 'isolate'
+                }}>
+                  <SlideViewer
+                    slide={s}
+                    citationStyle={presentation.citation_style}
+                    theme={presentation.theme}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop view - full editor
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -557,9 +647,9 @@ function PresentationPageContent() {
                 <span className="font-mono text-xs text-destructive">Save failed</span>
               </div>
             ) : (
-              <AutoSaveIndicator 
-                hasUnsavedChanges={hasUnsavedChanges || saving} 
-                lastSaved={lastSaved} 
+              <AutoSaveIndicator
+                hasUnsavedChanges={hasUnsavedChanges || saving}
+                lastSaved={lastSaved}
               />
             )}
             <span className="rounded-md border border-border bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground">
