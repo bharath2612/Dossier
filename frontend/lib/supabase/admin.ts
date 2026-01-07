@@ -21,3 +21,6 @@ export const supabaseAdmin = supabaseUrl && supabaseServiceKey
 
 export const isSupabaseAdminConfigured = () => supabaseAdmin !== null;
 
+
+
+
