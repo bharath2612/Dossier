@@ -39,6 +39,7 @@ function PresentationPageContent() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [exporting, setExporting] = useState(false);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const generationStartedRef = useRef(false);
 
   // Set user ID in store
   useEffect(() => {
@@ -56,11 +57,21 @@ function PresentationPageContent() {
 
     // If generate=true, this is a draft ID and we need to create a presentation first
     const handleGenerateFromDraft = async () => {
+      // Prevent duplicate calls
+      if (generationStartedRef.current) {
+        console.log('[Generate] Already started, skipping duplicate call');
+        return;
+      }
+
       if (!user) {
         // Redirect to home if not authenticated
         router.push('/');
         return;
       }
+
+      // Mark as started
+      generationStartedRef.current = true;
+      console.log('[Generate] Starting presentation generation from draft');
 
       try {
         usePresentationStore.getState().setLoading(true);
@@ -100,9 +111,11 @@ function PresentationPageContent() {
         // Redirect to the actual presentation page (without generate=true)
         router.replace(`/presentation/${result.presentation_id}`);
       } catch (err) {
-        console.error('Error generating presentation from draft:', err);
+        console.error('[Generate] Error generating presentation from draft:', err);
         usePresentationStore.getState().setError(err instanceof Error ? err.message : 'Failed to generate presentation');
         usePresentationStore.getState().setLoading(false);
+        // Reset flag on error so user can retry
+        generationStartedRef.current = false;
       }
     };
 
