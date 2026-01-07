@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/hooks/useAuth';
 import { useOutlineGenerationStore } from '@/store/outline-generation';
 import { useOutlineStream } from '@/lib/hooks/useOutlineStream';
+import { useOutlineAutoSave } from '@/lib/hooks/useOutlineAutoSave';
 import {
   PromptInput,
   PromptBanner,
@@ -16,6 +17,7 @@ import {
   OutlineList,
   GenerateCTA,
 } from '@/components/outline-generator';
+import { AutoSaveIndicator } from '@/components/outline/auto-save-indicator';
 import type { GenerationMode } from '@/store/types';
 
 function OutlineGeneratorContent() {
@@ -25,6 +27,9 @@ function OutlineGeneratorContent() {
 
   const store = useOutlineGenerationStore();
   const { startGeneration, cancel } = useOutlineStream();
+
+  // Auto-save outline edits to draft
+  const { hasUnsavedChanges, lastSaved } = useOutlineAutoSave();
 
   const {
     status,
@@ -125,6 +130,13 @@ function OutlineGeneratorContent() {
             <span className="text-sm font-medium text-foreground">Dossier AI</span>
           </div>
           <div className="flex items-center gap-3">
+            {/* Auto-save indicator */}
+            {isComplete && (
+              <AutoSaveIndicator
+                hasUnsavedChanges={hasUnsavedChanges}
+                lastSaved={lastSaved}
+              />
+            )}
             {!isIdle && (
               <Button
                 variant="ghost"

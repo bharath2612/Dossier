@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Search, ArrowRight } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Sparkles, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { GenerationMode } from '@/store/types';
 
@@ -23,11 +23,16 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<GenerationMode>('fast');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
 
-  // Rotate placeholder every 3 seconds
+  // Cycle through placeholders with slide-up animation
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderIndex((i) => (i + 1) % EXAMPLE_PROMPTS.length);
+      setIsAnimating(true);
+      setTimeout(() => {
+        setPlaceholderIndex((i) => (i + 1) % EXAMPLE_PROMPTS.length);
+        setIsAnimating(false);
+      }, 300); // Half of transition time
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -35,7 +40,7 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (prompt.trim().length >= 20 && !disabled) {
+      if (prompt.trim().length >= 30 && !disabled) {
         onSubmit(prompt.trim(), mode);
       }
     },
@@ -52,7 +57,7 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
     [handleSubmit]
   );
 
-  const isValid = prompt.trim().length >= 20;
+  const isValid = prompt.trim().length >= 30;
 
   return (
     <div className="w-full max-w-3xl mx-auto">
@@ -76,11 +81,25 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="mb-6">
         <div className="relative">
+          {/* Animated placeholder */}
+          {!prompt && (
+            <div className="pointer-events-none absolute left-5 top-4 text-base text-muted-foreground overflow-hidden h-[1.5rem]">
+              <div
+                className={cn(
+                  'transition-all duration-300',
+                  isAnimating ? 'translate-y-[-100%] opacity-0' : 'translate-y-0 opacity-100'
+                )}
+              >
+                e.g., {EXAMPLE_PROMPTS[placeholderIndex]}
+              </div>
+            </div>
+          )}
+
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`e.g., ${EXAMPLE_PROMPTS[placeholderIndex]}`}
+            placeholder=""
             disabled={disabled}
             className={cn(
               'w-full resize-none rounded-xl border border-border bg-card px-5 py-4 text-base leading-relaxed text-foreground placeholder-muted-foreground outline-none transition-all',
@@ -96,12 +115,12 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
             <span
               className={cn(
                 'font-mono text-xs',
-                prompt.length < 20
+                prompt.length < 30
                   ? 'text-muted-foreground'
                   : 'text-brand'
               )}
             >
-              {prompt.length}/20 min
+              {prompt.length}/30 min
             </span>
           </div>
         </div>
@@ -152,58 +171,22 @@ export function PromptInput({ onSubmit, disabled = false }: PromptInputProps) {
               'disabled:cursor-not-allowed disabled:opacity-40'
             )}
           >
-            Generate
-            <ArrowRight className="h-4 w-4" />
+            <span>Generate</span>
+            <span className="text-xs opacity-60 ml-1">
+              {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}+↵
+            </span>
           </button>
         </div>
 
-        {/* Mode Description */}
-        <div className="mt-3 text-center">
-          <p className="text-xs text-muted-foreground">
-            {mode === 'fast' ? (
-              <>Instant outline generation using AI knowledge</>
-            ) : (
-              <>Web research for data-backed content with citations (takes longer)</>
-            )}
-          </p>
-        </div>
-
-        {/* Keyboard Hint */}
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Press{' '}
-          <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs">
-            {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}
-          </kbd>{' '}
-          +{' '}
-          <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs">
-            Enter
-          </kbd>{' '}
-          to generate
-        </p>
+        {/* Mode Description - Only for research mode */}
+        {mode === 'research' && (
+          <div className="mt-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              Web research for data-backed content with citations (takes longer)
+            </p>
+          </div>
+        )}
       </form>
-
-      {/* Example Prompts */}
-      <div className="text-center">
-        <p className="mb-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          Try an example
-        </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {EXAMPLE_PROMPTS.slice(0, 3).map((example) => (
-            <button
-              key={example}
-              onClick={() => setPrompt(example)}
-              disabled={disabled}
-              className={cn(
-                'rounded-md border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-all',
-                'hover:border-brand/50 hover:text-foreground',
-                'disabled:cursor-not-allowed disabled:opacity-50'
-              )}
-            >
-              {example.length > 30 ? example.slice(0, 30) + '...' : example}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

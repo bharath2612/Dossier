@@ -17,7 +17,7 @@
 | Category | Technology |
 |----------|------------|
 | Framework | Next.js 15 (App Router) |
-| AI | Anthropic Claude API |
+| AI | Vercel AI SDK + Anthropic Claude |
 | Search | Brave Search API |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth (Google OAuth) |

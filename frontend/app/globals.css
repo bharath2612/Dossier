@@ -295,3 +295,31 @@ html.no-transition * {
 .animate-indeterminate {
   animation: indeterminate 1.5s ease-in-out infinite;
 }
+
+/* Slide-up placeholder animation */
+@keyframes slide-up-cycle {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  14% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  16% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  17% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  18% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}

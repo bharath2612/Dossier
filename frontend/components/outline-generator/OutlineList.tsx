@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -16,7 +16,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useOutlineGenerationStore } from '@/store/outline-generation';
@@ -34,6 +34,10 @@ interface OutlineListProps {
 export function OutlineList({ slides, status, streamingBuffer = '', currentStreamingSlide = 0 }: OutlineListProps) {
   const store = useOutlineGenerationStore();
   const [newSlideIds, setNewSlideIds] = useState<Set<number>>(new Set());
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
 
   const isGenerating = status === 'generating' || status === 'preprocessing' || status === 'researching';
   const isEditable = status === 'complete';
@@ -47,6 +51,63 @@ export function OutlineList({ slides, status, streamingBuffer = '', currentStrea
       }
     }
   }, [slides.length, isGenerating, newSlideIds, slides]);
+
+  // Auto-scroll logic - scroll to bottom when new content arrives
+  useEffect(() => {
+    if (!isGenerating || !autoScrollEnabled) return;
+
+    // Scroll to bottom smoothly
+    const scrollToBottom = () => {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth',
+      });
+    };
+
+    // Use requestAnimationFrame to ensure DOM has updated
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(scrollToBottom);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [slides.length, streamingBuffer, isGenerating, autoScrollEnabled]);
+
+  // Detect user scroll to pause auto-scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!isGenerating) return;
+
+      const currentScrollTop = window.scrollY;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = window.innerHeight;
+      const scrolledToBottom = scrollHeight - clientHeight - currentScrollTop < 100;
+
+      // Check if user scrolled up (manual scroll)
+      if (currentScrollTop < lastScrollTopRef.current) {
+        isUserScrollingRef.current = true;
+        setAutoScrollEnabled(false);
+      }
+
+      // Re-enable auto-scroll if user scrolls back to bottom
+      if (scrolledToBottom && isUserScrollingRef.current) {
+        isUserScrollingRef.current = false;
+        setAutoScrollEnabled(true);
+      }
+
+      lastScrollTopRef.current = currentScrollTop;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isGenerating]);
+
+  // Reset auto-scroll when generation starts
+  useEffect(() => {
+    if (isGenerating) {
+      setAutoScrollEnabled(true);
+      isUserScrollingRef.current = false;
+    }
+  }, [isGenerating]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -171,12 +232,21 @@ export function OutlineList({ slides, status, streamingBuffer = '', currentStrea
     [store]
   );
 
+  const handleScrollToBottom = useCallback(() => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: 'smooth',
+    });
+    setAutoScrollEnabled(true);
+    isUserScrollingRef.current = false;
+  }, []);
+
   if (slides.length === 0 && !isGenerating) {
     return null;
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto py-6">
+    <div ref={containerRef} className="w-full max-w-3xl mx-auto py-6">
       {/* Loading state with progress bar */}
       {(status === 'preprocessing' || status === 'researching') && slides.length === 0 && (
         <motion.div
@@ -332,6 +402,32 @@ export function OutlineList({ slides, status, streamingBuffer = '', currentStrea
             )}
           </p>
         </div>
+      )}
+
+      {/* Scroll to Bottom Button - appears when auto-scroll is disabled during generation */}
+      {isGenerating && !autoScrollEnabled && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className="fixed bottom-8 right-8 z-50"
+        >
+          <button
+            onClick={handleScrollToBottom}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 rounded-full',
+              'bg-brand text-brand-foreground font-medium text-sm',
+              'shadow-lg shadow-brand/30',
+              'hover:shadow-xl hover:shadow-brand/40',
+              'transition-all duration-200',
+              'border border-brand/20'
+            )}
+            aria-label="Scroll to bottom"
+          >
+            <ArrowDown className="h-4 w-4" />
+            Jump to bottom
+          </button>
+        </motion.div>
       )}
     </div>
   );

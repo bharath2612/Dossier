@@ -1,21 +1,18 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { OutlineSlide, Slide, CitationStyle } from '@/lib/types/agents';
 
-const apiKey = process.env.ANTHROPIC_API_KEY;
+function getAnthropicClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
-if (!apiKey) {
-  console.warn('⚠️  ANTHROPIC_API_KEY not found in environment variables');
+  if (!apiKey) {
+    throw new Error('⚠️  ANTHROPIC_API_KEY not found in environment variables');
+  }
+
+  return createAnthropic({
+    apiKey,
+  });
 }
-
-const client = new Anthropic({
-  apiKey: apiKey || '',
-});
-
-const anthropic = createAnthropic({
-  apiKey: apiKey || '',
-});
 
 interface SlideGeneratorInput {
   outlineSlides: OutlineSlide[];
@@ -99,30 +96,20 @@ Generate complete slide content following the system rules. Return valid JSON on
     console.log('Calling Slide Generator Agent...');
     const startTime = Date.now();
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 8000,
-      temperature: 0.7,
+    const anthropic = getAnthropicClient();
+    const response = await generateText({
+      model: anthropic('claude-sonnet-4-5-20250929'),
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+      prompt: userPrompt,
+      maxTokens: 8000,
+      temperature: 0.7,
     });
 
     const duration = Date.now() - startTime;
     console.log(`Slide Generator completed in ${duration}ms`);
 
-    // Extract text content
-    const textContent = response.content.find((block) => block.type === 'text');
-    if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text content in response');
-    }
-
     // Parse JSON response
-    const rawText = textContent.text.trim();
+    const rawText = response.text.trim();
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {
@@ -154,7 +141,7 @@ Generate complete slide content following the system rules. Return valid JSON on
     });
 
     // Calculate token usage
-    const tokenUsage = response.usage.input_tokens + response.usage.output_tokens;
+    const tokenUsage = response.usage.promptTokens + response.usage.completionTokens;
 
     return {
       success: true,
@@ -195,7 +182,8 @@ Generate complete slide content following the system rules. Return valid JSON on
 
   console.log('Calling Slide Generator Agent (streaming)...');
 
-  const result = streamText({
+  const anthropic = getAnthropicClient();
+  const result = await streamText({
     model: anthropic('claude-sonnet-4-5-20250929'),
     system: SYSTEM_PROMPT,
     prompt: userPrompt,

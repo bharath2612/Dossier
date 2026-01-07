@@ -33,29 +33,60 @@ export function AuthCallbackClient() {
 
     // Check if we need to generate a presentation
     const shouldGenerate = sessionStorage.getItem('generate_after_auth');
-    const citationStyle = sessionStorage.getItem('citation_style') || 'inline';
-    const theme = sessionStorage.getItem('theme') || 'minimal';
+    const draftIdForGeneration = sessionStorage.getItem('draft_id_for_generation');
 
-    if (shouldGenerate === 'true' && outline && currentDraft) {
-      console.log('[AuthCallback] Starting presentation generation');
+    if (shouldGenerate === 'true' && draftIdForGeneration) {
+      console.log('[AuthCallback] User wants to generate presentation for draft:', draftIdForGeneration);
       sessionStorage.removeItem('generate_after_auth');
-      sessionStorage.removeItem('citation_style');
-      sessionStorage.removeItem('theme');
-      
-      setStatus('Generating your presentation...');
-      
-      const generate = async () => {
+      sessionStorage.removeItem('draft_id_for_generation');
+
+      setStatus('Preparing to generate your presentation...');
+
+      // Ensure user exists in database, then redirect to presentation generation
+      const ensureUserAndRedirect = async () => {
         try {
           // Import apiClient dynamically to avoid SSR issues
           const { apiClient } = await import('@/lib/api/client');
-          
+
           // First ensure user exists in database
           await apiClient.ensureUser({
             user_id: user.id,
             email: user.email,
           });
 
-          // Generate presentation
+          console.log('[AuthCallback] User ensured, redirecting to presentation generation');
+
+          // Redirect to presentation page with generate=true flag
+          // This will trigger the generation flow
+          router.replace(`/presentation/${draftIdForGeneration}?generate=true`);
+        } catch (err) {
+          console.error('[AuthCallback] Failed to ensure user:', err);
+          // On error, still try to generate
+          router.replace(`/presentation/${draftIdForGeneration}?generate=true`);
+        }
+      };
+
+      ensureUserAndRedirect();
+    } else if (shouldGenerate === 'true' && outline && currentDraft) {
+      // Legacy flow for old draft store (keeping for backwards compatibility)
+      console.log('[AuthCallback] Starting presentation generation (legacy flow)');
+      sessionStorage.removeItem('generate_after_auth');
+      const citationStyle = sessionStorage.getItem('citation_style') || 'inline';
+      const theme = sessionStorage.getItem('theme') || 'minimal';
+      sessionStorage.removeItem('citation_style');
+      sessionStorage.removeItem('theme');
+
+      setStatus('Generating your presentation...');
+
+      const generate = async () => {
+        try {
+          const { apiClient } = await import('@/lib/api/client');
+
+          await apiClient.ensureUser({
+            user_id: user.id,
+            email: user.email,
+          });
+
           const result = await apiClient.generatePresentation({
             draft_id: currentDraft.id,
             outline,
@@ -65,12 +96,9 @@ export function AuthCallbackClient() {
           });
 
           console.log('[AuthCallback] Success, going to presentation');
-          
-          // Redirect to presentation page which will show generating status
           router.replace(`/presentation/${result.presentation_id}`);
         } catch (err) {
           console.error('[AuthCallback] Generation failed:', err);
-          // On error, still go to dashboard where they can retry
           router.replace('/dashboard?error=generation_failed');
         }
       };

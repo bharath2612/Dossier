@@ -130,9 +130,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { prompt, mode = 'fast' } = body;
 
-    if (!prompt || prompt.trim().length < 20) {
+    if (!prompt || prompt.trim().length < 30) {
       return new Response(
-        createSSEMessage({ type: 'error', message: 'Prompt must be at least 20 characters' }),
+        createSSEMessage({ type: 'error', message: 'Prompt must be at least 30 characters' }),
         {
           status: 400,
           headers: {

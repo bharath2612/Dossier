@@ -35,20 +35,118 @@ export function GenerateCTA({ slideCount, draftId }: GenerateCTAProps) {
     }
 
     if (!user) {
+      // Save any pending edits before auth
+      if (draftId && store.hasUnsavedChanges) {
+        try {
+          const outline = {
+            title: store.slides[0]?.title || 'Untitled Presentation',
+            slides: store.slides.map((slide, idx) => ({
+              index: idx,
+              title: slide.title,
+              bullets: slide.bullets,
+              type: idx === 0 ? 'intro' : idx === store.slides.length - 1 ? 'conclusion' : 'content',
+            })),
+          };
+
+          // Fire and forget save (don't wait for it)
+          fetch(`/api/drafts/${draftId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outline }),
+          }).then(response => {
+            if (response.ok) {
+              store.markSaved();
+              console.log('[GenerateCTA] Draft saved before auth');
+            }
+          }).catch(error => {
+            console.error('[GenerateCTA] Failed to save draft before auth:', error);
+          });
+        } catch (error) {
+          console.error('[GenerateCTA] Error preparing draft save:', error);
+        }
+      }
+
+      // Store intent to generate after auth
+      if (draftId) {
+        sessionStorage.setItem('generate_after_auth', 'true');
+        sessionStorage.setItem('draft_id_for_generation', draftId);
+      }
       setShowAuthModal(true);
       return;
     }
 
-    // Navigate to presentation page
     setIsNavigating(true);
+
+    // Save any pending edits before generating presentation
+    if (draftId && store.hasUnsavedChanges) {
+      try {
+        const outline = {
+          title: store.slides[0]?.title || 'Untitled Presentation',
+          slides: store.slides.map((slide, idx) => ({
+            index: idx,
+            title: slide.title,
+            bullets: slide.bullets,
+            type: idx === 0 ? 'intro' : idx === store.slides.length - 1 ? 'conclusion' : 'content',
+          })),
+        };
+
+        const response = await fetch(`/api/drafts/${draftId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outline }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save draft');
+        }
+
+        store.markSaved();
+        console.log('[GenerateCTA] Draft saved before generation');
+      } catch (error) {
+        console.error('[GenerateCTA] Failed to save draft:', error);
+        store.setError('Failed to save changes. Please try again.');
+        setIsNavigating(false);
+        return;
+      }
+    }
+
+    // Navigate to presentation page
     if (draftId) {
       router.push(`/presentation/${draftId}?generate=true`);
     }
   };
 
   // Handle auth success
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
     setShowAuthModal(false);
+
+    // Save any pending edits before generating presentation
+    if (draftId && store.hasUnsavedChanges) {
+      try {
+        const outline = {
+          title: store.slides[0]?.title || 'Untitled Presentation',
+          slides: store.slides.map((slide, idx) => ({
+            index: idx,
+            title: slide.title,
+            bullets: slide.bullets,
+            type: idx === 0 ? 'intro' : idx === store.slides.length - 1 ? 'conclusion' : 'content',
+          })),
+        };
+
+        const response = await fetch(`/api/drafts/${draftId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outline }),
+        });
+
+        if (response.ok) {
+          store.markSaved();
+        }
+      } catch (error) {
+        console.error('[GenerateCTA] Failed to save draft:', error);
+      }
+    }
+
     if (draftId) {
       router.push(`/presentation/${draftId}?generate=true`);
     }
